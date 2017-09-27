@@ -2,7 +2,7 @@ open Core.Std
    
 let do_hash file =
   In_channel.with_file file ~f:(fun ic ->
-    let open cryptokit in
+    let open Cryptokit in
     hash_channel (Hash.md5 ()) ic
     |> transform_string (Hexa.encode ())
     |> print_endline
