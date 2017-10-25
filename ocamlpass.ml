@@ -283,17 +283,21 @@ let rec main_loop () =
   let str = read_line () in
   if str = "exit" then begin
       encrypt filebuff ();
-      exit 0; ()
+      Gc.full_major ();
+      exit 0;
+      ()
     end
   else if str = "quit" then
     begin
       encrypt filebuff ();
+      Gc.full_major ();
       exit 0;
       ()
     end
   else if str = "q" then
     begin
       encrypt filebuff ();
+      Gc.full_major ();
       exit 0;
       ()
     end
@@ -316,12 +320,6 @@ let rec main_loop () =
   else if str = "read" then begin
       read();
       main_loop()
-    end
-  else if str = "write" then
-    begin
-      encrypt globalbuff () ;
-      (*load_file() ;*)
-      (*mergecrypt();*)
     end
   else begin
       print_endline "";
