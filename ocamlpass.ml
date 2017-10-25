@@ -29,12 +29,8 @@ let keystore = ref ""
 let help = [
     " ";
     "Type 'read' to read the entire file.";
-    "Type 's' to search for a string.";
-    "Type 'h' to search for a section.";
-    "Type 'l' to list all sections / headers.";
+    "Type 'bsearch' to search for and print a block.";
     "Type 'block' to insert a new password block.";
-    "Type 'removeblock' to delete a block and its contents.";
-    "Type 'delete' to delete a string from a section.";
     "Type 'q' to quit."
 ]
              
@@ -137,7 +133,7 @@ let mergecrypt () =
 ()
 
 let read () =
-  printf "%s\n" (Buffer.contents filebuff) ;
+  print_endline (Buffer.contents filebuff) ;
 ()
 
 let read_glob_queue () =
@@ -270,6 +266,20 @@ let rec createblock () =
     end ;
 ()
 
+(* Search for and output block. *)
+let search_block () =
+  print_string "Enter block name: " ;
+  let block_name = read_line () in
+  let block_title = "==== "^block_name^" ====" in
+  let block_end = "==== END ====" in
+  let s = (Buffer.contents filebuff) in
+  let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
+  let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
+  print_endline (Array.get x 0);
+    (*   print_endline (Str.matched_string (Buffer.contents filebuff));*)
+()
+  
+
 (* =============================== MAIN and Configure ============================ *)
 
 (* Main interaction loop via tail recursion. *)
@@ -319,6 +329,10 @@ let rec main_loop () =
     end
   else if str = "read" then begin
       read();
+      main_loop()
+    end
+  else if str = "bsearch" then begin
+      search_block();
       main_loop()
     end
   else begin
