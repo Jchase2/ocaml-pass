@@ -1,0 +1,6 @@
+true: package(scrypt-kdf)
+true: package(str)
+true: package(unix)
+true: package(nocrypto.unix)
+true: package(core)
+

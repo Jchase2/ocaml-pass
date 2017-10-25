@@ -1,1 +1,1 @@
-corebuild -package cryptokit main.native
+corebuild -use-ocamlfind ocamlpass.native
