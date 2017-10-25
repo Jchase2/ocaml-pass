@@ -12,7 +12,7 @@ A simple text based password manager written in ocaml.
 
 ## Requirements
 
-Ocaml, core, ocaml-scrypt-kdf, Nocrypto.  
+Ocaml, core, ocaml-scrypt-kdf, Nocrypto, ocaml-pcre.   
 
 ## How To:
 
@@ -44,20 +44,13 @@ When you search for a string, if you just type "email" in this example, all inst
 of email will be printed. This is generally easier to read, but it really comes down to 
 personal preference. 
 
+I'll have more searching / removing / etc implemented shortly. 
 Here's the menu:
 
 ```
-Type 'o' to open a password file.
-Type 'r' to read the entire file.
-Type 's' to search for a string.
-Type 'h' to search for a section.
-Type 'l' to list all sections / headers.
-Type 'i' to insert a single new line. (e.g a username:password combo.)
-Type 'b' to insert multiple lines at a time.
-Type 'n' to create a new section.
-Type 'd' to delete a section and its contents.
-Type 'k' to delete a string from a section.
-Type 'f' to create and open a new encrypted pw file.
+Type 'read' to read the entire file.
+Type 'bsearch' to search for and print a block.
+Type 'block' to insert a new password block.
 Type 'q' to quit.
 ```
 
