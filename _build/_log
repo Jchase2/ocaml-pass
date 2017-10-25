@@ -1,0 +1,30 @@
+### Starting build.
+# Target: ocamlpass.ml.depends, tags: { package(core), package(nocrypto.unix), package(scrypt-kdf), package(str), package(unix), ppx(ppx-jane -as-ppx), bin_annot, debug, extension:ml, file:ocamlpass.ml, ocaml, ocamldep, quiet, short_paths, thread, traverse }
+ocamlfind ocamldep -package core -package nocrypto.unix -package unix -package str -package scrypt-kdf -ppx 'ppx-jane -as-ppx' -modules ocamlpass.ml > ocamlpass.ml.depends
+# Target: ocamlpass.cmo, tags: { package(core), package(nocrypto.unix), package(scrypt-kdf), package(str), package(unix), ppx(ppx-jane -as-ppx), bin_annot, byte, compile, debug, extension:cmo, extension:ml, file:ocamlpass.cmo, file:ocamlpass.ml, implem, ocaml, quiet, short_paths, thread, traverse }
+ocamlfind ocamlc -c -w A-4-33-40-41-42-43-34-44 -strict-sequence -g -bin-annot -short-paths -thread -package core -package nocrypto.unix -package unix -package str -package scrypt-kdf -ppx 'ppx-jane -as-ppx' -o ocamlpass.cmo ocamlpass.ml
++ ocamlfind ocamlc -c -w A-4-33-40-41-42-43-34-44 -strict-sequence -g -bin-annot -short-paths -thread -package core -package nocrypto.unix -package unix -package str -package scrypt-kdf -ppx 'ppx-jane -as-ppx' -o ocamlpass.cmo ocamlpass.ml
+File "ocamlpass.ml", line 108, characters 4-22:
+Warning 3: deprecated: String.set
+Use Bytes.set instead.
+File "ocamlpass.ml", line 286, characters 6-12:
+Warning 21: this statement never returns (or has an unsound type.)
+File "ocamlpass.ml", line 291, characters 6-12:
+Warning 21: this statement never returns (or has an unsound type.)
+File "ocamlpass.ml", line 297, characters 6-12:
+Warning 21: this statement never returns (or has an unsound type.)
+# Target: ocamlpass.cmx, tags: { package(core), package(nocrypto.unix), package(scrypt-kdf), package(str), package(unix), ppx(ppx-jane -as-ppx), bin_annot, compile, debug, extension:cmx, extension:ml, file:ocamlpass.cmx, file:ocamlpass.ml, implem, native, ocaml, quiet, short_paths, thread, traverse }
+ocamlfind ocamlopt -c -w A-4-33-40-41-42-43-34-44 -strict-sequence -g -bin-annot -short-paths -thread -package core -package nocrypto.unix -package unix -package str -package scrypt-kdf -ppx 'ppx-jane -as-ppx' -o ocamlpass.cmx ocamlpass.ml
++ ocamlfind ocamlopt -c -w A-4-33-40-41-42-43-34-44 -strict-sequence -g -bin-annot -short-paths -thread -package core -package nocrypto.unix -package unix -package str -package scrypt-kdf -ppx 'ppx-jane -as-ppx' -o ocamlpass.cmx ocamlpass.ml
+File "ocamlpass.ml", line 108, characters 4-22:
+Warning 3: deprecated: String.set
+Use Bytes.set instead.
+File "ocamlpass.ml", line 286, characters 6-12:
+Warning 21: this statement never returns (or has an unsound type.)
+File "ocamlpass.ml", line 291, characters 6-12:
+Warning 21: this statement never returns (or has an unsound type.)
+File "ocamlpass.ml", line 297, characters 6-12:
+Warning 21: this statement never returns (or has an unsound type.)
+# Target: ocamlpass.native, tags: { package(core), package(nocrypto.unix), package(scrypt-kdf), package(str), package(unix), ppx(ppx-jane -as-ppx), bin_annot, debug, dont_link_with, extension:native, file:ocamlpass.native, link, native, ocaml, program, quiet, short_paths, thread, traverse }
+ocamlfind ocamlopt -linkpkg -g -thread -package core -package nocrypto.unix -package unix -package str -package scrypt-kdf ocamlpass.cmx -o ocamlpass.native
+# Compilation successful.
