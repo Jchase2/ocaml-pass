@@ -22,7 +22,6 @@ let cryptfile = "ocamlpass.crypt"
 let filebuff = Buffer.create 500 (* This is the read in file on program launch. *)
 let globalbuff = Buffer.create 500 (* Utility buffer for user input / re-encryption stuff. *)
 let globalqueue = Queue.create () (* Utility queue. *)
-let pwstore = ref "" 
 let keystore = ref ""
 
 (* Help Dialogue *)
@@ -348,7 +347,6 @@ let login () =
   print_string "Password: ";
   let pwstr = read_line () in
   let password = (Cstruct.of_string pwstr) in
-  pwstore := (Cstruct.to_string password);
   let mykey = Scrypt_kdf.scrypt_kdf ~password ~salt ~n ~r ~p ~dk_len in
   keystore := (Cstruct.to_string mykey);
   load_file ();
