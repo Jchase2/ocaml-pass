@@ -13,11 +13,6 @@ open Nocrypto.Cipher_block
 open Printf
    
 (* ============================== GLOBAL EXPRESSIONS ========================== *)
-let salt = (Cstruct.of_string "rN)K_=BPCeQj83SbA)zi-Zgd8S88`ZFWI;+uK/1}H#w&?ATgo9|=zT(y+2DjlO|O") 
-let n = 16384 (* CPU / memory cost Parameter *)
-let r = 8 (* Specifies the block size in bytes for scrypt *)
-let p = 4 (* Paralellization parameter for scrypt. *)
-let dk_len = 32l (* Length of key, 8 * blocksize = 256. Is AES Max key size. *)
 let cryptfile = "ocamlpass.crypt"
 let filebuff = Buffer.create 500 (* This is the read in file on program launch. *)
 let globalbuff = Buffer.create 500 (* Utility buffer for user input / re-encryption stuff. *)
@@ -271,7 +266,6 @@ let search_block () =
   let block_name = read_line () in
   let block_title = "==== "^block_name^" ====" in
   let block_end = "==== END ====" in
-  let s = (Buffer.contents filebuff) in
   let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
   let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
   print_endline (Array.get x 0);
@@ -343,14 +337,22 @@ let rec main_loop () =
   
 (* Configure pw, generate scrypt key, decrypt and load in file on launch. *)
 let login () =
+  let salt = (Cstruct.of_string "rN)K_=BPCeQj83SbA)zi-Zgd8S88`ZFWI;+uK/1}H#w&?ATgo9|=zT(y+2DjlO|O") in
+  let n = 16384 (* CPU / memory cost Parameter *) in
+  let r = 8 (* Specifies the block size in bytes for scrypt *) in
+  let p = 4 (* Paralellization parameter for scrypt. *) in
+  let dk_len = 32l (* Length of key, 8 * blocksize = 256. Is AES Max key size. *) in
   print_endline "";
   print_string "Password: ";
   let pwstr = read_line () in
   let password = (Cstruct.of_string pwstr) in
   let mykey = Scrypt_kdf.scrypt_kdf ~password ~salt ~n ~r ~p ~dk_len in
   keystore := (Cstruct.to_string mykey);
+  let password = "no" in
+  let mykey = "no" in
   load_file ();
   print_endline "Logged in. ";
+  Gc.full_major (); (* Garbage collect, most of this should get collected. *)
   main_loop() ;
 ;; (* Can I get rid of the ';;' here? *)
 
