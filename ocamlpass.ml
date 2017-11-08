@@ -43,7 +43,7 @@ let rec print_list_string mylist () = match mylist with
 hex, which are used for padding, except G which is added so it's still a single char.
 Am considering replacing these with a map, although they're small so performance is fine. *)
     
-let dectohex x () =
+let dectohex (x) =
   let hexlist =
     [1, '1'; 2, '2'; 3, '3'; 4, '4'; 5, '5';
      6, '6'; 7, '7'; 8, '8'; 9, '9'; 10, 'A';
@@ -51,7 +51,7 @@ let dectohex x () =
   let ret = List.assoc x hexlist in
 (ret)
 
-let hextodec x () =
+let hextodec (x) =
   let hexlist =
     ['1', 1; '2', 2; '3', 3; '4', 4; '5', 5; '6', 6;
      '7', 7; '8', 8; '9', 9; 'A', 10; 'B', 11; 'C', 12;
@@ -154,68 +154,20 @@ let get_user_input_loop (rstring) =
     done;;
 () 
 
-
-(* ----------------------------- Key Storage Functions ------------------------------- *)
-
-(* splits a string into list of chars *)
-let explode s =
-  let rec exp i l =
-    if i < 0 then l else exp (i - 1) (s.[i] :: l) in
-  exp (String.length s - 1) []
-
-(* Takes a list of chars and turns it into a string *)
-let string_of_chars chars = 
-  let buf = Buffer.create 16 in
-  List.iter (Buffer.add_char buf) chars;
-  Buffer.contents buf
-
-
-  let split key split_len () =
-  let rec sublist b e l = 
-  match l with
-    [] -> failwith "sublist"
-  | h :: t -> 
-     let tail = if e=0 then [] else sublist (b-1) (e-1) t in
-     if b>0 then tail else h :: tail
-  in
-  let split_amount = (String.length key) / split_len in
-  print_int split_len;
-  print_int split_amount;
-  let y = explode key in
-  let rec dosplit n a b acc =
-    if (n <> split_amount) then
-      begin
-        let x = sublist a b y in
-        dosplit (n + 1) (a + split_len) (b + split_len) (x :: acc)
-      end
-    else begin
-        let x = sublist ((b - split_len) + 1) ((List.length y) - 1) y in
-        x :: acc
-        
-      end
-  in
-  let n = 0 in
-  let a = 0 in
-  let b = split_len - 1 in
-  let acc = [] in
-  let ret = dosplit n a b acc in
-(ret)
-
 (* Splits key up, stores it in memory so automated memory key searchers fail. *)
-let rand_store key () =
+let rand_store (key) =
   (* Get psuedorandom number to determine how many pieces to cut the key into. *)
   let rec get_split_amount () =
-    Random.self_init ();
     let n = Random.int 64 in
     match n < 10 with
     | false -> n 
-    | true -> get_split_amount ()
-  in    
+    | true -> get_split_amount () in    
   let split_amount = get_split_amount () in
   let split_len = ((String.length key) / split_amount) in
-  split key split_len ();
-()
+  print_int split_len;
+()                     
   
+
 (* =============================== Encryption / Decryption / File I/O ========================== *)
 (* Load in encrypted file *)
 (* Also decrypt it. *)
