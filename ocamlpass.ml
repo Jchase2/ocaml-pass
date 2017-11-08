@@ -43,7 +43,7 @@ let rec print_list_string mylist () = match mylist with
 hex, which are used for padding, except G which is added so it's still a single char.
 Am considering replacing these with a map, although they're small so performance is fine. *)
     
-let dectohex (x) =
+let dectohex x () =
   let hexlist =
     [1, '1'; 2, '2'; 3, '3'; 4, '4'; 5, '5';
      6, '6'; 7, '7'; 8, '8'; 9, '9'; 10, 'A';
@@ -51,7 +51,7 @@ let dectohex (x) =
   let ret = List.assoc x hexlist in
 (ret)
 
-let hextodec (x) =
+let hextodec x () =
   let hexlist =
     ['1', 1; '2', 2; '3', 3; '4', 4; '5', 5; '6', 6;
      '7', 7; '8', 8; '9', 9; 'A', 10; 'B', 11; 'C', 12;
@@ -154,6 +154,68 @@ let get_user_input_loop (rstring) =
     done;;
 () 
 
+
+(* ----------------------------- Key Storage Functions ------------------------------- *)
+
+(* splits a string into list of chars *)
+let explode s =
+  let rec exp i l =
+    if i < 0 then l else exp (i - 1) (s.[i] :: l) in
+  exp (String.length s - 1) []
+
+(* Takes a list of chars and turns it into a string *)
+let string_of_chars chars = 
+  let buf = Buffer.create 16 in
+  List.iter (Buffer.add_char buf) chars;
+  Buffer.contents buf
+
+
+  let split key split_len () =
+  let rec sublist b e l = 
+  match l with
+    [] -> failwith "sublist"
+  | h :: t -> 
+     let tail = if e=0 then [] else sublist (b-1) (e-1) t in
+     if b>0 then tail else h :: tail
+  in
+  let split_amount = (String.length key) / split_len in
+  print_int split_len;
+  print_int split_amount;
+  let y = explode key in
+  let rec dosplit n a b acc =
+    if (n <> split_amount) then
+      begin
+        let x = sublist a b y in
+        dosplit (n + 1) (a + split_len) (b + split_len) (x :: acc)
+      end
+    else begin
+        let x = sublist ((b - split_len) + 1) ((List.length y) - 1) y in
+        x :: acc
+        
+      end
+  in
+  let n = 0 in
+  let a = 0 in
+  let b = split_len - 1 in
+  let acc = [] in
+  let ret = dosplit n a b acc in
+(ret)
+
+(* Splits key up, stores it in memory so automated memory key searchers fail. *)
+let rand_store key () =
+  (* Get psuedorandom number to determine how many pieces to cut the key into. *)
+  let rec get_split_amount () =
+    Random.self_init ();
+    let n = Random.int 64 in
+    match n < 10 with
+    | false -> n 
+    | true -> get_split_amount ()
+  in    
+  let split_amount = get_split_amount () in
+  let split_len = ((String.length key) / split_amount) in
+  split key split_len ();
+()
+  
 (* =============================== Encryption / Decryption / File I/O ========================== *)
 (* Load in encrypted file *)
 (* Also decrypt it. *)
@@ -208,6 +270,44 @@ let encrypt buf () =
   flush oc;
   close_out oc;
 ()
+
+(*
+(* Encrypts a message, stores key for that message randomly in mem. *)
+let quickcrypt message () =
+  let () = Nocrypto_entropy_unix.initialize () in
+  let randnum = Nocrypto.Rng.generate 256 in (* Random numbers *)
+  let randhash = Nocrypto.Hash.SHA256.digest randnum in (* Hash of randnum *)
+  let cshashbytes = Bytes.of_string (Cstruct.to_string randhash) in
+  let cutbytes = Bytes.sub cshashbytes 0 16 in (* cut the bytes from above down to 16 bytes. *)
+  let iv = (Cstruct.of_string (Bytes.to_string cutbytes)) in (*Get IV, string of cutbytes. *)
+  let key = AES.CBC.of_secret (Nocrypto.Rng.generate 256) in (* Generate usable key from mykey *)
+  let paddingsize = padlen message () in
+  let paddingbyte = dectohex paddingsize in
+  let padding = Bytes.make paddingsize paddingbyte in
+  let ciphertext = AES.CBC.encrypt ~key ~iv (Cstruct.of_string (message)) in
+  let cipher_iv = padding ^ ciphertext in
+  let x = secure_store cipher_iv in 
+  Gc.full_major ();
+() 
+
+(* Decrypts a message, gets key stored randomly in mem.*) 
+let quickdecrypt cipher () =
+  let localbuff = Buffer.create 500 in
+  let s = cipher in
+  let iv = (Cstruct.of_string (Bytes.sub_string s 0 16)) in
+  removeiv s localbuff () ;
+  let mykey = get_key quick_key () in (* Get key from memory *)
+  let txtpadding = AES.CBC.decrypt ~key ~iv (Cstruct.of_string (Buffer.contents localbuff)) in
+  let lastbyte =  ((Cstruct.to_string txtpadding).[String.length (Cstruct.to_string txtpadding) - 1]) in 
+  let toremove = hextodec lastbyte in
+  let reversed_txt =
+    (Bytes.sub_string (rev_string (Cstruct.to_string txtpadding)) toremove
+                      ((String.length (Cstruct.to_string txtpadding)) - toremove)) in
+  let key = rev_string reversed_txt in
+(key)
+  
+ *)
+  
 
 (* ======================== Insertion / Searching Functions ========================= *)
 
@@ -344,12 +444,11 @@ let login () =
   let dk_len = 32l (* Length of key, 8 * blocksize = 256. Is AES Max key size. *) in
   print_endline "";
   print_string "Password: ";
-  let pwstr = read_line () in
-  let password = (Cstruct.of_string pwstr) in
+  let password = (Cstruct.of_string (read_line())) in
   let mykey = Scrypt_kdf.scrypt_kdf ~password ~salt ~n ~r ~p ~dk_len in
   keystore := (Cstruct.to_string mykey);
-  let password = "no" in
-  let mykey = "no" in
+  let password = "" in
+  let mykey = "" in
   load_file ();
   print_endline "Logged in. ";
   Gc.full_major (); (* Garbage collect, most of this should get collected. *)
