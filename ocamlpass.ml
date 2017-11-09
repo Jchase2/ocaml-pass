@@ -28,17 +28,8 @@ let help = [
     "Type 'block' to insert a new password block.";
     "Type 'q' to quit."
 ]
-             
-(* ============================== UTILITIES =========================== *)
-(* PRINT LIST STRING *)
-let rec print_list_string mylist () = match mylist with
-  | [] -> print_endline " "
-  | head::body ->
-     begin
-       print_endline head;
-       print_list_string body
-     end
-()
+
+(* =============================== Crypt Utilities ============================================= *)
 
 (* dectohex and hex2dec are just associative lists to get values for
 hex, which are used for padding, except G which is added so it's still a single char.
@@ -60,18 +51,6 @@ let hextodec (x) =
   let ret = List.assoc x hexlist in
 (ret)
     
-(* This function pushes the queue into the global buffer. *)
-let rec queuetobuff () =
-  if  (Queue.is_empty globalqueue) = true then
-    ()
-  else 
-    begin
-      Buffer.add_string globalbuff (Queue.pop globalqueue);
-      Buffer.add_string globalbuff "\n";
-      queuetobuff()
-    end ;
-()
-
 (* Copies bytes to buffer, except the first 16 bytes. *)
 (* This essentially helps remove the IV prior to decryption. *)
 let removeiv bytestream buff () =
@@ -79,15 +58,6 @@ let removeiv bytestream buff () =
     Buffer.add_char buff (Bytes.get bytestream i)
   done ;
 ()
-
-(* Read cryptfile into a bytestream. *)
-let readtobytes () =
-  let ic = open_in_gen [Open_creat] 0o664 cryptfile in
-  let n = in_channel_length ic in
-  let s = Bytes.create n in
-  really_input ic s 0 n;
-  close_in ic;
-(s)
 
 (* Reverses a string... *)
 let rev_string str =
@@ -120,42 +90,17 @@ let padlen byts () =
   loop();
 (!i)
 
-(* Merges the buffers... *)
-(* Should only be used if new block was added. *)
-let mergecrypt () =
-  Buffer.add_buffer filebuff globalbuff ; (* Adds globalbuff to end of initial. *)
-  Buffer.clear globalbuff ;
-()
+(* Read cryptfile into a bytestream. *)
+let readtobytes () =
+  let ic = open_in_gen [Open_creat] 0o664 cryptfile in
+  let n = in_channel_length ic in
+  let s = Bytes.create n in
+  really_input ic s 0 n;
+  close_in ic;
+(s)
 
-let read () =
-  print_endline (Buffer.contents filebuff) ;
-()
-
-let read_glob_queue () =
-  Queue.iter print_endline globalqueue;
-  ()
-  
-(* Read in Loop *)
-(* Takes rstring for user prompt *)
-(* This doesn't feel right, should abstract or integrate elsewhere... *)
-let get_user_input_loop (rstring) = 
-  let quit_loop = ref false in 
-  while (not !quit_loop) do 
-    print_endline "Type 'done' when finished entering. " ;
-    print_string rstring ;
-    let astr = read_line () in 
-    if astr <> "done" then
-      begin
-        Queue.add astr globalqueue;
-      end
-    else
-      begin
-        quit_loop := true
-      end 
-    done;;
-()                
-
-(* =============================== Encryption / Decryption / File I/O ========================== *)
+         
+(* =============================== Encryption / Decryption ========================== *)
 
 (* This takes a given message and encrypts it. Key is temporary. *)
 (* Used for storing the actual key and for encpyting and decrypting buffers. *)
@@ -191,6 +136,26 @@ let quickdecrypt (cipher) =
   let txt = rev_string reversed_txt in
 (txt)
 
+let cryptbuff buff () =
+      let localbuff = Buffer.create 500 in
+      Buffer.add_string localbuff (quickcrypt (Buffer.contents buff));
+      Buffer.clear buff;
+      Buffer.add_buffer buff localbuff;
+      Buffer.clear localbuff;
+()
+
+let decryptbuff buff () =
+  if (Buffer.length buff = 0) then
+    ()
+  else begin
+      let localbuff = Buffer.create 500 in
+      Buffer.add_string localbuff (quickdecrypt (Buffer.contents buff));
+      Buffer.clear buff;
+      Buffer.add_buffer buff localbuff;
+      Buffer.clear localbuff;
+    end;    
+()
+  
 (* Load in encrypted file *)
 (* Also decrypt it. *)
 (* Could probably use some more factoring... *)
@@ -213,6 +178,7 @@ let load_file () =
     let plaintext = rev_string reversed_txt in
     Buffer.clear localbuff ;
     Buffer.add_string filebuff plaintext ;
+    cryptbuff filebuff ();
   else begin
       print_endline "File does not exist! A new file has been created." ;
       print_endline "Type '?' or 'help' for usage." ;
@@ -244,14 +210,49 @@ let encrypt buf () =
   flush oc;
   close_out oc;
 ()
+ 
+             
+(* ============================== UTILITIES =========================== *)
 
-  
+(* PRINT LIST STRING *)
+let rec print_list_string mylist () = match mylist with
+  | [] -> print_endline " "
+  | head::body ->
+     begin
+       print_endline head;
+       print_list_string body
+     end
+()
+
+(* Merges the buffers... *)
+(* Should only be used if new block was added. *)
+let mergecrypt () =
+  decryptbuff globalbuff ();
+  decryptbuff filebuff ();
+  Buffer.add_char filebuff '\n';
+  Buffer.add_buffer filebuff globalbuff ; (* Adds globalbuff to end of initial. *)
+  Buffer.clear globalbuff ;
+  cryptbuff filebuff ();
+  cryptbuff globalbuff ();
+()
+
+let read () =
+  decryptbuff filebuff ();
+  print_endline (Buffer.contents filebuff) ;
+  cryptbuff filebuff ();
+()
+
+let read_glob_queue () =
+  Queue.iter print_endline globalqueue;
+()
+    
 (* ======================== Insertion / Searching Functions ========================= *)
 
 (* Insert Block *)
 
 let rec createblock () =
   (* Creates block, reads in from user *)
+  let localbuff = Buffer.create 100 in
   let a = "==== " in
   let b = " ====" in
   let d = "==== END ====" in
@@ -259,46 +260,68 @@ let rec createblock () =
   print_string "Type block name: ";
   let astr = read_line () in
   let c = a ^ astr ^ b in
-  Queue.add c globalqueue;
-  get_user_input_loop("Enter String: ");
-  Queue.add d globalqueue;
-  queuetobuff() ;
-  print_endline (Buffer.contents globalbuff);
+  Buffer.add_string localbuff c ;
+  Buffer.add_char localbuff '\n';
+  let quit_loop = ref false in 
+  while (not !quit_loop) do 
+    print_endline "Type 'done' when finished entering. " ;
+    print_string "Enter String: ";
+    let astr = read_line () in 
+    if astr <> "done" then
+      begin
+        Buffer.add_string localbuff astr;
+        Buffer.add_char localbuff '\n';
+      end
+    else
+      begin
+        quit_loop := true
+      end 
+  done;         
+  Buffer.add_string localbuff d;
+  print_endline (Buffer.contents localbuff);
   print_endline "Does this look correct? (y/n): ";
   let astr = read_line () in
   if (astr = "y") then
     begin
-      queuetobuff () ;
-      Queue.clear globalqueue;
+      decryptbuff globalbuff ();
+      Buffer.add_buffer globalbuff localbuff;
+      Buffer.clear localbuff;
+      cryptbuff globalbuff ();
       mergecrypt() ;
     end
   else if (astr = "yes") then
     begin
-      queuetobuff () ;
-      Queue.clear globalqueue;
-      mergecrypt();
+      decryptbuff globalbuff ();
+      Buffer.add_buffer globalbuff localbuff;
+      Buffer.clear localbuff;
+      cryptbuff globalbuff ();
+      mergecrypt() ;
     end
   else if (astr = "n") then
     begin
-      Queue.clear globalqueue ;
+      Buffer.clear localbuff;
       createblock () ;
     end
   else if (astr = "no") then
     begin
-      Queue.clear globalqueue ;
+      Buffer.clear localbuff;
       createblock () ;
     end
   else
     begin
       print_endline "Invalid Input" ;
       print_endline "Assuming yes for now. " ;
-      queuetobuff ();
-      Queue.clear globalqueue; 
+      decryptbuff globalbuff ();
+      Buffer.add_buffer globalbuff localbuff;
+      Buffer.clear localbuff;
+      mergecrypt() ;
+      cryptbuff globalbuff ();
     end ;
 ()
 
 (* Search for and output block. *)
 let search_block () =
+  decryptbuff filebuff ();
   print_string "Enter block name: " ;
   let block_name = read_line () in
   let block_title = "==== "^block_name^" ====" in
@@ -306,7 +329,7 @@ let search_block () =
   let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
   let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
   print_endline (Array.get x 0);
-    (*   print_endline (Str.matched_string (Buffer.contents filebuff));*)
+  cryptbuff filebuff ();
 ()
   
 
@@ -322,6 +345,7 @@ let rec main_loop () =
   print_string "Command: ";
   let str = read_line () in
   if str = "exit" then begin
+      decryptbuff filebuff ();
       encrypt filebuff ();
       Gc.full_major ();
       exit 0;
@@ -329,6 +353,7 @@ let rec main_loop () =
     end
   else if str = "quit" then
     begin
+      decryptbuff filebuff ();
       encrypt filebuff ();
       Gc.full_major ();
       exit 0;
@@ -336,6 +361,7 @@ let rec main_loop () =
     end
   else if str = "q" then
     begin
+      decryptbuff filebuff ();
       encrypt filebuff ();
       Gc.full_major ();
       exit 0;
@@ -351,10 +377,6 @@ let rec main_loop () =
     end
   else if str = "block" then begin
       createblock();
-      main_loop()
-    end
-  else if str = "insert" then begin
-      get_user_input_loop("Write String: ");
       main_loop()
     end
   else if str = "read" then begin
