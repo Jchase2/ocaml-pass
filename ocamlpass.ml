@@ -18,6 +18,7 @@ let filebuff = Buffer.create 500 (* This is the read in file on program launch. 
 let globalbuff = Buffer.create 500 (* Utility buffer for user input / re-encryption stuff. *)
 let globalqueue = Queue.create () (* Utility queue. *)
 let keystore = ref ""
+let tmpkstore = ref ""
 
 (* Help Dialogue *)
 let help = [
@@ -152,23 +153,44 @@ let get_user_input_loop (rstring) =
         quit_loop := true
       end 
     done;;
-() 
-
-(* Splits key up, stores it in memory so automated memory key searchers fail. *)
-let rand_store (key) =
-  (* Get psuedorandom number to determine how many pieces to cut the key into. *)
-  let rec get_split_amount () =
-    let n = Random.int 64 in
-    match n < 10 with
-    | false -> n 
-    | true -> get_split_amount () in    
-  let split_amount = get_split_amount () in
-  let split_len = ((String.length key) / split_amount) in
-  print_int split_len;
-()                     
-  
+()                
 
 (* =============================== Encryption / Decryption / File I/O ========================== *)
+
+(* This takes a given message and encrypts it. Key is temporary. *)
+(* Used for storing the actual key and for encpyting and decrypting buffers. *)
+let quickcrypt (message) =
+  let () = Nocrypto_entropy_unix.initialize () in
+  let randnum = Nocrypto.Rng.generate 256 in (* Random numbers *)
+  let randhash = Nocrypto.Hash.SHA256.digest randnum in (* Hash of randnum *)
+  let cshashbytes = Bytes.of_string (Cstruct.to_string randhash) in
+  let cutbytes = Bytes.sub cshashbytes 0 16 in (* cut the bytes from above down to 16 bytes. *)
+  let iv = (Cstruct.of_string (Bytes.to_string cutbytes)) in (*Get IV, string of cutbytes. *)
+  let paddingsize = padlen message () in
+  let paddingbyte = dectohex paddingsize in
+  let padding = Bytes.make paddingsize paddingbyte in
+  let key =  AES.CBC.of_secret (Cstruct.of_string !tmpkstore) in
+  let cipher_padding = message ^ padding in
+  let ciphertext = AES.CBC.encrypt ~key ~iv (Cstruct.of_string (cipher_padding)) in
+  let cipher_iv = (Cstruct.to_string iv) ^ (Cstruct.to_string ciphertext) in
+  Gc.full_major ();
+(cipher_iv)
+
+(* Decrypts whatever quickcrypt encrypted using it's key. *) 
+let quickdecrypt (cipher) =
+  let s = cipher in
+  let a = String.sub cipher 16 ((String.length cipher) - 16) in
+  let iv = (Cstruct.of_string (Bytes.sub_string s 0 16)) in
+  let key =  AES.CBC.of_secret (Cstruct.of_string !tmpkstore) in
+  let txtpadding = AES.CBC.decrypt ~key ~iv (Cstruct.of_string a) in
+  let lastbyte =  ((Cstruct.to_string txtpadding).[String.length (Cstruct.to_string txtpadding) - 1]) in
+  let toremove = hextodec lastbyte in
+  let reversed_txt =
+    (Bytes.sub_string (rev_string (Cstruct.to_string txtpadding)) toremove
+                      ((String.length (Cstruct.to_string txtpadding)) - toremove)) in
+  let txt = rev_string reversed_txt in
+(txt)
+
 (* Load in encrypted file *)
 (* Also decrypt it. *)
 (* Could probably use some more factoring... *)
@@ -179,7 +201,7 @@ let load_file () =
     removeiv s localbuff ();
     (* Set up decryption parameters *)
     let iv = (Cstruct.of_string (Bytes.sub_string s 0 16)) in
-    let mykey = (Cstruct.of_string !keystore) in
+    let mykey = (Cstruct.of_string (quickdecrypt !keystore)) in
     let key = AES.CBC.of_secret mykey in (* Generate usable key from mykey *)
     (* txtpadding is decrypted file with padding still included...*)
     let txtpadding = AES.CBC.decrypt ~key ~iv (Cstruct.of_string (Buffer.contents localbuff)) in
@@ -208,7 +230,7 @@ let encrypt buf () =
   let cshashbytes = Bytes.of_string (Cstruct.to_string cshash) in
   let cutbytes = Bytes.sub cshashbytes 0 16 in (* cut the bytes from above down to 16 bytes. *)
   let iv = (Cstruct.of_string (Bytes.to_string cutbytes)) in (*Get IV, string of cutbytes. *)
-  let mykey = (Cstruct.of_string !keystore) in 
+  let mykey = (Cstruct.of_string (quickdecrypt !keystore)) in
   let key = AES.CBC.of_secret mykey in (* Generate usable key from mykey *)
   let bytecontent = (Buffer.to_bytes buf) in
   let paddingsize = padlen bytecontent () in
@@ -223,44 +245,7 @@ let encrypt buf () =
   close_out oc;
 ()
 
-(*
-(* Encrypts a message, stores key for that message randomly in mem. *)
-let quickcrypt message () =
-  let () = Nocrypto_entropy_unix.initialize () in
-  let randnum = Nocrypto.Rng.generate 256 in (* Random numbers *)
-  let randhash = Nocrypto.Hash.SHA256.digest randnum in (* Hash of randnum *)
-  let cshashbytes = Bytes.of_string (Cstruct.to_string randhash) in
-  let cutbytes = Bytes.sub cshashbytes 0 16 in (* cut the bytes from above down to 16 bytes. *)
-  let iv = (Cstruct.of_string (Bytes.to_string cutbytes)) in (*Get IV, string of cutbytes. *)
-  let key = AES.CBC.of_secret (Nocrypto.Rng.generate 256) in (* Generate usable key from mykey *)
-  let paddingsize = padlen message () in
-  let paddingbyte = dectohex paddingsize in
-  let padding = Bytes.make paddingsize paddingbyte in
-  let ciphertext = AES.CBC.encrypt ~key ~iv (Cstruct.of_string (message)) in
-  let cipher_iv = padding ^ ciphertext in
-  let x = secure_store cipher_iv in 
-  Gc.full_major ();
-() 
-
-(* Decrypts a message, gets key stored randomly in mem.*) 
-let quickdecrypt cipher () =
-  let localbuff = Buffer.create 500 in
-  let s = cipher in
-  let iv = (Cstruct.of_string (Bytes.sub_string s 0 16)) in
-  removeiv s localbuff () ;
-  let mykey = get_key quick_key () in (* Get key from memory *)
-  let txtpadding = AES.CBC.decrypt ~key ~iv (Cstruct.of_string (Buffer.contents localbuff)) in
-  let lastbyte =  ((Cstruct.to_string txtpadding).[String.length (Cstruct.to_string txtpadding) - 1]) in 
-  let toremove = hextodec lastbyte in
-  let reversed_txt =
-    (Bytes.sub_string (rev_string (Cstruct.to_string txtpadding)) toremove
-                      ((String.length (Cstruct.to_string txtpadding)) - toremove)) in
-  let key = rev_string reversed_txt in
-(key)
   
- *)
-  
-
 (* ======================== Insertion / Searching Functions ========================= *)
 
 (* Insert Block *)
@@ -380,6 +365,10 @@ let rec main_loop () =
       search_block();
       main_loop()
     end
+  else if str = "crypt" then begin
+      print_endline (quickcrypt str);
+      main_loop()
+    end
   else begin
       print_endline "";
       print_endline "That is not a defined option. ";
@@ -397,10 +386,11 @@ let login () =
   print_endline "";
   print_string "Password: ";
   let password = (Cstruct.of_string (read_line())) in
+  let () = Nocrypto_entropy_unix.initialize () in
+  tmpkstore := (Cstruct.to_string (Nocrypto.Rng.generate 16));
   let mykey = Scrypt_kdf.scrypt_kdf ~password ~salt ~n ~r ~p ~dk_len in
-  keystore := (Cstruct.to_string mykey);
-  let password = "" in
-  let mykey = "" in
+  keystore := quickcrypt (Cstruct.to_string mykey);
+  let password = "" in (* Might overwrite if not on heap, if I'm understanding correctly. *)
   load_file ();
   print_endline "Logged in. ";
   Gc.full_major (); (* Garbage collect, most of this should get collected. *)
