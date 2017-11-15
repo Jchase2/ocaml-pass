@@ -16,7 +16,6 @@ open Printf
 let cryptfile = "ocamlpass.crypt"
 let filebuff = Buffer.create 500 (* This is the read in file on program launch. *)
 let globalbuff = Buffer.create 500 (* Utility buffer for user input / re-encryption stuff. *)
-let globalqueue = Queue.create () (* Utility queue. *)
 let keystore = ref ""
 let tmpkstore = ref ""
 
@@ -242,9 +241,6 @@ let read () =
   cryptbuff filebuff ();
 ()
 
-let read_glob_queue () =
-  Queue.iter print_endline globalqueue;
-()
     
 (* ======================== Insertion / Searching Functions ========================= *)
 
