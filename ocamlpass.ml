@@ -327,7 +327,20 @@ let search_block () =
   print_endline (Array.get x 0);
   cryptbuff filebuff ();
 ()
-  
+
+let remove_block () =
+  decryptbuff filebuff ();
+  print_string "Enter block name to remove: " ;
+  let block_name = read_line () in
+  let block_title = "==== "^block_name^" ====" in
+  let block_end = "==== END ====" in
+  let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
+  let x = Pcre.replace ~rex:regex (Buffer.contents filebuff) in
+  print_endline x;
+  Buffer.clear filebuff;
+  Buffer.add_string filebuff x;
+  cryptbuff filebuff ();
+()
 
 (* =============================== MAIN and Configure ============================ *)
 
@@ -386,6 +399,10 @@ let rec main_loop () =
   else if str = "crypt" then begin
       print_endline (quickcrypt str);
       main_loop()
+    end
+  else if str = "rb" then begin
+      remove_block ();
+      main_loop ()
     end
   else begin
       print_endline "";
