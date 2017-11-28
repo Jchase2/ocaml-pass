@@ -25,6 +25,7 @@ let help = [
     "Type 'read' to read the entire file.";
     "Type 'bsearch' to search for and print a block.";
     "Type 'block' to insert a new password block.";
+    "Type 'rb' to remove a block.";
     "Type 'q' to quit."
 ]
 
