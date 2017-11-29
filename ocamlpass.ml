@@ -23,9 +23,10 @@ let tmpkstore = ref ""
 let help = [
     " ";
     "Type 'read' to read the entire file.";
-    "Type 'bsearch' to search for and print a block.";
+    "Type 'blocksearch' to search for and print a block.";
     "Type 'block' to insert a new password block.";
-    "Type 'rb' to remove a block.";
+    "Type 'removeblock' to remove a block.";
+    "Type 'listblocks' to list all block headers."; 
     "Type 'q' to quit."
 ]
 
@@ -316,6 +317,18 @@ let rec createblock () =
     end ;
 ()
 
+(* Output List of Blocks *)
+let section_list () =
+  decryptbuff filebuff ();
+  let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]("(?!^==== END ====$)(==== .*? ====)") in
+  let x = Pcre.extract_all ~rex:regex (Buffer.contents filebuff) in
+  (* Preferably, will replace this with more functional thing. Couldn't figure out Array.iter nested stuff.*)
+  for i = 0 to (Array.length x) -1 do
+    print_endline (Array.get (Array.get x i) 0)
+  done;
+  cryptbuff filebuff ();
+()
+
 (* Search for and output block. *)
 let search_block () =
   decryptbuff filebuff ();
@@ -324,6 +337,16 @@ let search_block () =
   let block_title = "==== "^block_name^" ====" in
   let block_end = "==== END ====" in
   let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
+  let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
+  print_endline (Array.get x 0);
+  cryptbuff filebuff ();
+()
+
+let search_string () =
+  decryptbuff filebuff ();
+  print_string "Enter string name: " ;
+  let stringname = read_line () in
+  let regex = Pcre.regexp ~flags:[`CASELESS;] (stringname^".*") in
   let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
   print_endline (Array.get x 0);
   cryptbuff filebuff ();
@@ -393,16 +416,20 @@ let rec main_loop () =
       read();
       main_loop()
     end
-  else if str = "bsearch" then begin
+  else if str = "blocksearch" then begin
       search_block();
       main_loop()
     end
-  else if str = "crypt" then begin
-      print_endline (quickcrypt str);
+  else if str = "removeblock" then begin
+      remove_block ();
+      main_loop ()
+    end
+  else if str = "stringsearch" then begin
+      search_string();
       main_loop()
     end
-  else if str = "rb" then begin
-      remove_block ();
+  else if str = "listblocks" then begin
+      section_list ();
       main_loop ()
     end
   else begin
