@@ -338,9 +338,13 @@ let search_block () =
   let block_title = "==== "^block_name^" ====" in
   let block_end = "==== END ====" in
   let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
-  let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
-  print_endline (Array.get x 0);
-  cryptbuff filebuff ();
+  try
+    let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
+    print_endline (Array.get x 0);
+    cryptbuff filebuff ();
+  with
+    Not_found -> print_endline "Not found.";
+                 cryptbuff filebuff();
 ()
 
 (* Searches for strings starting with user input. *)
@@ -348,13 +352,17 @@ let search_string () =
   decryptbuff filebuff ();
   print_string "Enter string name: " ;
   let stringname = read_line () in
-  let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]("(?!^==== "^stringname^" ====$)(^"^stringname^".*?)$") in
-  let x = Pcre.extract_all ~rex:regex (Buffer.contents filebuff) in
-  print_endline "";
-  for i = 0 to (Array.length x) -1 do
-    print_endline (Array.get (Array.get x i) 0)
-  done;
-  cryptbuff filebuff ();
+  try
+    let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]("(?!^==== "^stringname^" ====$)(^"^stringname^".*?)$") in
+    let x = Pcre.extract_all ~rex:regex (Buffer.contents filebuff) in
+    print_endline "";
+    for i = 0 to (Array.length x) -1 do
+      print_endline (Array.get (Array.get x i) 0)
+    done;
+    cryptbuff filebuff ();
+  with
+    Not_found -> print_endline "Not found.";
+                 cryptbuff filebuff();
 ()
 
 let remove_block () =
@@ -363,12 +371,16 @@ let remove_block () =
   let block_name = read_line () in
   let block_title = "==== "^block_name^" ====" in
   let block_end = "==== END ====" in
-  let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
-  let x = Pcre.replace ~rex:regex (Buffer.contents filebuff) in
-  print_endline x;
-  Buffer.clear filebuff;
-  Buffer.add_string filebuff x;
-  cryptbuff filebuff ();
+  try
+    let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
+    let x = Pcre.replace ~rex:regex (Buffer.contents filebuff) in
+    print_endline x;
+    Buffer.clear filebuff;
+    Buffer.add_string filebuff x;
+    cryptbuff filebuff ();
+  with
+    Not_found -> print_endline "Not found.";
+                 cryptbuff filebuff();
 ()
 
 (* removes a string from within a block. *)
@@ -378,15 +390,24 @@ let remove_string () =
   let block_name = read_line () in
   let block_title = "==== "^block_name^" ====" in
   let block_end = "==== END ====" in
-  let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
-  let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
-  print_endline "Enter string to remove, or beginning of string(s) to remove.";
-  print_endline "Entering email will remove all strings beginning with email.";
-  let stringname = read_line () in
-  let regextwo = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE] ("("^stringname^".*?)$") in
-  let y = Pcre.replace ~rex:regextwo (Array.get x 0) in
-  print_endline y;
-  cryptbuff filebuff ();
+  try
+    let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
+    let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
+    print_endline "Enter string to remove, or beginning of string(s) to remove.";
+    print_endline "Entering email will remove all strings beginning with email.";
+    print_string "Enter: ";
+    let stringname = read_line () in
+    try
+      let regextwo = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE] ("("^stringname^".*?)$") in
+      let y = Pcre.replace ~rex:regextwo (Array.get x 0) in
+      print_endline y;
+      cryptbuff filebuff ();
+    with
+      Not_found -> print_endline "Not found.";
+                   cryptbuff filebuff();
+  with
+    Not_found -> print_endline "Not found.";
+                 cryptbuff filebuff();
 ()
 
 (* =============================== MAIN and Configure ============================ *)
