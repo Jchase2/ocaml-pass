@@ -16,7 +16,7 @@ open Printf
 let cryptfile = "ocamlpass.crypt"
 let filebuff = Buffer.create 500 (* This is the read in file on program launch. *)
 let globalbuff = Buffer.create 500 (* Utility buffer for user input / re-encryption stuff. *)
-let keystore = ref ""
+let keystore = ref "" (* Always encrypted. *)
 let tmpkstore = ref ""
 
 (* Help Dialogue *)
