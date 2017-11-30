@@ -23,6 +23,7 @@ let tmpkstore = ref ""
 let help = [
     " ";
     "Type 'read' to read the entire file.";
+    "Type 'stringsearch' to search for and print a string.";
     "Type 'blocksearch' to search for and print a block.";
     "Type 'block' to insert a new password block.";
     "Type 'removeblock' to remove a block.";
