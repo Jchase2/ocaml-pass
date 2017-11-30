@@ -10,10 +10,11 @@ Except theoretically more secure.
 * Scrypt password generated key on login.
 * Never writes to disk.
 * Encrypts key in memory until used. Tries to keep data encrypted as well, until used.
-* Allows user to organize passwords / info by "section" / "block".  
-* Allows user to add blocks with a single or multiple lines of text within.  
-* Allows user to search for sections.
-* Allows user to read entire contents of the "file". 
+* Can organize passwords / info by "block". (Blocks explained below.)  
+* Add blocks with a single or multiple lines of text within.  
+* Search for sections. Also, list all sections.
+* Search for lines starting with user input. 
+* Read entire contents of the "file". 
 
 ## Requirements
 
@@ -54,9 +55,11 @@ Here's the menu:
 
 ```
 Type 'read' to read the entire file.
-Type 'bsearch' to search for and print a block.
+Type 'stringsearch' to search for and print a string.
+Type 'blocksearch' to search for and print a block.
 Type 'block' to insert a new password block.
-Type 'rb' to remove a block.
+Type 'removeblock' to remove a block.
+Type 'listblocks' to list all block headers.
 Type 'q' to quit.
 ```
 
