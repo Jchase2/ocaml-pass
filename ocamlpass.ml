@@ -27,6 +27,7 @@ let help = [
     "Type 'blocksearch' to search for and print a block.";
     "Type 'block' to insert a new password block.";
     "Type 'removeblock' to remove a block.";
+    "Type 'removestring' to remove a string.";
     "Type 'listblocks' to list all block headers."; 
     "Type 'q' to quit."
 ]
@@ -400,7 +401,11 @@ let remove_string () =
     try
       let regextwo = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE] ("("^stringname^".*?)$") in
       let y = Pcre.replace ~rex:regextwo (Array.get x 0) in
-      print_endline y;
+      let t = Pcre.replace ~rex:regex (Buffer.contents filebuff) in
+      Buffer.clear filebuff;
+      Buffer.add_string filebuff t;
+      Buffer.add_string filebuff y;
+      print_endline (Buffer.contents filebuff);
       cryptbuff filebuff ();
     with
       Not_found -> print_endline "Not found.";
