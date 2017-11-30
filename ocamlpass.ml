@@ -342,13 +342,17 @@ let search_block () =
   cryptbuff filebuff ();
 ()
 
+(* Searches for strings starting with user input. *)
 let search_string () =
   decryptbuff filebuff ();
   print_string "Enter string name: " ;
   let stringname = read_line () in
-  let regex = Pcre.regexp ~flags:[`CASELESS;] (stringname^".*") in
-  let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
-  print_endline (Array.get x 0);
+  let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]("(?!^==== "^stringname^" ====$)(^"^stringname^".*?)$") in
+  let x = Pcre.extract_all ~rex:regex (Buffer.contents filebuff) in
+  print_endline "";
+  for i = 0 to (Array.length x) -1 do
+    print_endline (Array.get (Array.get x i) 0)
+  done;
   cryptbuff filebuff ();
 ()
 
