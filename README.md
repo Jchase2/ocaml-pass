@@ -60,6 +60,7 @@ Type 'stringsearch' to search for and print a string.
 Type 'blocksearch' to search for and print a block.
 Type 'block' to insert a new password block.
 Type 'removeblock' to remove a block.
+Type 'removestring' to remove a string.
 Type 'listblocks' to list all block headers.
 Type 'q' to quit.
 ```

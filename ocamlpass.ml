@@ -25,9 +25,10 @@ let help = [
     "Type 'read' to read the entire file.";
     "Type 'stringsearch' to search for and print a string.";
     "Type 'blocksearch' to search for and print a block.";
-    "Type 'block' to insert a new password block.";
+    "Type 'block' to insert a new block.";
+    "Type 'insert' to insert new lines into a block.";
     "Type 'removeblock' to remove a block.";
-    "Type 'removestring' to remove a string.";
+    "Type 'removestring' to remove string(s) from a block.";
     "Type 'listblocks' to list all block headers."; 
     "Type 'q' to quit."
 ]
