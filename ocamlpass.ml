@@ -371,6 +371,24 @@ let remove_block () =
   cryptbuff filebuff ();
 ()
 
+(* removes a string from within a block. *)
+let remove_string () =
+  decryptbuff filebuff ();
+  print_string "Enter block to remove string from: ";
+  let block_name = read_line () in
+  let block_title = "==== "^block_name^" ====" in
+  let block_end = "==== END ====" in
+  let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
+  let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
+  print_endline "Enter string to remove, or beginning of string(s) to remove.";
+  print_endline "Entering email will remove all strings beginning with email.";
+  let stringname = read_line () in
+  let regextwo = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE] ("("^stringname^".*?)$") in
+  let y = Pcre.replace ~rex:regextwo (Array.get x 0) in
+  print_endline y;
+  cryptbuff filebuff ();
+()
+
 (* =============================== MAIN and Configure ============================ *)
 
 (* Main interaction loop via tail recursion. *)
@@ -427,6 +445,10 @@ let rec main_loop () =
     end
   else if str = "removeblock" then begin
       remove_block ();
+      main_loop ()
+    end
+  else if str = "removestring" then begin
+      remove_string ();
       main_loop ()
     end
   else if str = "stringsearch" then begin
