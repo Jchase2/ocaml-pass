@@ -319,6 +319,52 @@ let rec createblock () =
     end ;
 ()
 
+(* Insert additional string(s) into a block. *)
+let insert_strings () =
+  let localbuff = Buffer.create 100 in
+  decryptbuff filebuff ();
+  print_string "Enter block to insert string(s) into: ";
+  let block_name = read_line () in
+  let block_title = "==== "^block_name^" ====" in
+  let block_end = "==== END ====" in
+  try
+    let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_title^".*?"^block_end) in
+    let x = Pcre.extract ~rex:regex (Buffer.contents filebuff) in
+    let quit_loop = ref false in
+    while (not !quit_loop) do 
+      print_endline "Type 'done' when finished entering. " ;
+      print_string "Enter String: ";
+      let astr = read_line () in
+      if astr <> "done" then
+        begin
+          Buffer.add_string localbuff astr;
+          Buffer.add_char localbuff '\n';
+        end
+      else
+        begin
+          quit_loop := true
+        end
+    done;    
+    try
+      let regextwo = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]  (block_end) in
+      let t = Pcre.replace ~rex:regextwo (Array.get x 0) in
+      let removex = Pcre.replace ~rex:regex (Buffer.contents filebuff) in
+      let finalstring = t ^ (Buffer.contents localbuff) ^ block_end in
+      print_endline finalstring;
+      Buffer.clear filebuff;
+      Buffer.add_string filebuff removex;
+      Buffer.add_string filebuff finalstring;
+      print_endline (Buffer.contents filebuff);
+      cryptbuff filebuff ();
+    with
+      Not_found -> print_endline "Not found.";
+                   cryptbuff filebuff();
+  with
+    Not_found -> print_endline "Not found.";
+                 cryptbuff filebuff();
+()
+  
+  
 (* Output List of Blocks *)
 let section_list () =
   decryptbuff filebuff ();
@@ -460,6 +506,10 @@ let rec main_loop () =
   else if str = "block" then begin
       createblock();
       main_loop()
+    end
+  else if str = "insert" then begin
+      insert_strings ();
+      main_loop ()
     end
   else if str = "read" then begin
       read();
