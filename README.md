@@ -11,7 +11,8 @@ Except theoretically more secure.
 * Never writes to disk.
 * Encrypts key in memory until used. Tries to keep data encrypted as well, until used.
 * Can organize passwords / info by "block". (Blocks explained below.)  
-* Add blocks with a single or multiple lines of text within.  
+* Add and remove blocks with a single or multiple lines of text within.  
+* Remove string(s) from blocks.
 * Search for sections. Also, list all sections.
 * Search for lines starting with user input. 
 * Read entire contents of the "file". 
