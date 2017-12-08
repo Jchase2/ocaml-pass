@@ -16,8 +16,8 @@ open Printf
 let cryptfile = "ocamlpass.crypt"
 let filebuff = Buffer.create 500 (* This is the read in file on program launch. *)
 let globalbuff = Buffer.create 500 (* Utility buffer for user input / re-encryption stuff. *)
+let kbf = Buffer.create 500 
 let keystore = ref "" (* Always encrypted. *)
-let tmpkstore = ref ""
 
 (* Help Dialogue *)
 let help = [
@@ -102,7 +102,6 @@ let readtobytes () =
   really_input ic s 0 n;
   close_in ic;
 (s)
-
          
 (* =============================== Encryption / Decryption ========================== *)
 
@@ -118,7 +117,11 @@ let quickcrypt (message) =
   let paddingsize = padlen message () in
   let paddingbyte = dectohex paddingsize in
   let padding = Bytes.make paddingsize paddingbyte in
-  let key =  AES.CBC.of_secret (Cstruct.of_string !tmpkstore) in
+  let tmpbf = Buffer.create 500 in 
+  for i = 0 to 31 do
+    Buffer.add_char tmpbf (Buffer.nth kbf  (i + 6));                          
+  done;
+  let key =  AES.CBC.of_secret (Cstruct.of_string (Buffer.contents tmpbf)) in
   let cipher_padding = message ^ padding in
   let ciphertext = AES.CBC.encrypt ~key ~iv (Cstruct.of_string (cipher_padding)) in
   let cipher_iv = (Cstruct.to_string iv) ^ (Cstruct.to_string ciphertext) in
@@ -130,7 +133,11 @@ let quickdecrypt (cipher) =
   let s = cipher in
   let a = String.sub cipher 16 ((String.length cipher) - 16) in
   let iv = (Cstruct.of_string (Bytes.sub_string s 0 16)) in
-  let key =  AES.CBC.of_secret (Cstruct.of_string !tmpkstore) in
+  let tmpbf = Buffer.create 500 in
+  for i = 0 to 31 do
+    Buffer.add_char tmpbf (Buffer.nth kbf (i + 6));                          
+  done;
+  let key =  AES.CBC.of_secret (Cstruct.of_string (Buffer.contents tmpbf)) in
   let txtpadding = AES.CBC.decrypt ~key ~iv (Cstruct.of_string a) in
   let lastbyte =  ((Cstruct.to_string txtpadding).[String.length (Cstruct.to_string txtpadding) - 1]) in
   let toremove = hextodec lastbyte in
@@ -554,7 +561,10 @@ let login () =
   print_string "Password: ";
   let password = (Cstruct.of_string (read_line())) in
   let () = Nocrypto_entropy_unix.initialize () in
-  tmpkstore := (Cstruct.to_string (Nocrypto.Rng.generate 16));
+  let rkn = 47 in
+  for i = 0 to rkn do
+    Buffer.add_string kbf (Cstruct.to_string (Nocrypto.Rng.generate 8));
+  done;
   let mykey = Scrypt_kdf.scrypt_kdf ~password ~salt ~n ~r ~p ~dk_len in
   keystore := quickcrypt (Cstruct.to_string mykey);
   let password = "" in (* Might overwrite if not on heap, if I'm understanding correctly. *)
@@ -566,3 +576,5 @@ let login () =
 
 login();
 main_loop()
+
+
