@@ -18,6 +18,7 @@ let filebuff = Buffer.create 500 (* This is the read in file on program launch. 
 let globalbuff = Buffer.create 500 (* Utility buffer for user input / re-encryption stuff. *)
 let kbf = Buffer.create 500 
 let keystore = ref "" (* Always encrypted. *)
+let knum = ref 0 (* Randomly generated increment initialized on start, used to ensure random creation of key. *)
 
 (* Help Dialogue *)
 let help = [
@@ -117,9 +118,10 @@ let quickcrypt (message) =
   let paddingsize = padlen message () in
   let paddingbyte = dectohex paddingsize in
   let padding = Bytes.make paddingsize paddingbyte in
-  let tmpbf = Buffer.create 500 in 
+  let tmpbf = Buffer.create 500 in
+  (* Creates a key from randomly generated kbf buffer at randomly generated increment. *)
   for i = 0 to 31 do
-    Buffer.add_char tmpbf (Buffer.nth kbf  (i + 6));                          
+    Buffer.add_char tmpbf (Buffer.nth kbf  (i + !knum));                          
   done;
   let key =  AES.CBC.of_secret (Cstruct.of_string (Buffer.contents tmpbf)) in
   Buffer.clear tmpbf;
@@ -135,8 +137,9 @@ let quickdecrypt (cipher) =
   let a = String.sub cipher 16 ((String.length cipher) - 16) in
   let iv = (Cstruct.of_string (Bytes.sub_string s 0 16)) in
   let tmpbf = Buffer.create 500 in
+  (* Creates a key from randomly generated kbf buffer at randomly generated increment. *)
   for i = 0 to 31 do
-    Buffer.add_char tmpbf (Buffer.nth kbf (i + 6));                          
+    Buffer.add_char tmpbf (Buffer.nth kbf (i + !knum));                          
   done;
   let key =  AES.CBC.of_secret (Cstruct.of_string (Buffer.contents tmpbf)) in
   Buffer.clear tmpbf;
@@ -567,6 +570,8 @@ let login () =
   for i = 0 to rkn do
     Buffer.add_string kbf (Cstruct.to_string (Nocrypto.Rng.generate 8));
   done;
+  Random.self_init ();
+  knum := (Random.int 6);
   let mykey = Scrypt_kdf.scrypt_kdf ~password ~salt ~n ~r ~p ~dk_len in
   keystore := quickcrypt (Cstruct.to_string mykey);
   let password = "" in (* Might overwrite if not on heap, if I'm understanding correctly. *)
