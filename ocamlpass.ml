@@ -122,6 +122,7 @@ let quickcrypt (message) =
     Buffer.add_char tmpbf (Buffer.nth kbf  (i + 6));                          
   done;
   let key =  AES.CBC.of_secret (Cstruct.of_string (Buffer.contents tmpbf)) in
+  Buffer.clear tmpbf;
   let cipher_padding = message ^ padding in
   let ciphertext = AES.CBC.encrypt ~key ~iv (Cstruct.of_string (cipher_padding)) in
   let cipher_iv = (Cstruct.to_string iv) ^ (Cstruct.to_string ciphertext) in
@@ -138,6 +139,7 @@ let quickdecrypt (cipher) =
     Buffer.add_char tmpbf (Buffer.nth kbf (i + 6));                          
   done;
   let key =  AES.CBC.of_secret (Cstruct.of_string (Buffer.contents tmpbf)) in
+  Buffer.clear tmpbf;
   let txtpadding = AES.CBC.decrypt ~key ~iv (Cstruct.of_string a) in
   let lastbyte =  ((Cstruct.to_string txtpadding).[String.length (Cstruct.to_string txtpadding) - 1]) in
   let toremove = hextodec lastbyte in
