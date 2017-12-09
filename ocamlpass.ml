@@ -77,10 +77,10 @@ let rev_string str =
 
 
 (* Recursive function to get padding length. *)
-let padlen byts () =
+let padlen message () =
   let i = ref 0 in
   let rec loop () =
-    let bytelength = (Bytes.length byts) in
+    let bytelength = (Cstruct.len message) in
     if ((bytelength mod 16) = 0) then
       begin
         i := 16;
@@ -110,51 +110,52 @@ let readtobytes () =
 (* Used for storing the actual key and for encpyting and decrypting buffers. *)
 let quickcrypt (message) =
   let () = Nocrypto_entropy_unix.initialize () in
-  let randnum = Nocrypto.Rng.generate 256 in (* Random numbers *)
+  let randnum = Nocrypto.Rng.generate 16 in (* Random numbers *)
   let randhash = Nocrypto.Hash.SHA256.digest randnum in (* Hash of randnum *)
   let cshashbytes = Bytes.of_string (Cstruct.to_string randhash) in
-  let cutbytes = Bytes.sub cshashbytes 0 16 in (* cut the bytes from above down to 16 bytes. *)
-  let iv = (Cstruct.of_string (Bytes.to_string cutbytes)) in (*Get IV, string of cutbytes. *)
+  let iv = (Cstruct.of_string (Bytes.to_string (Bytes.sub cshashbytes 0 16))) in (* cut the bytes from above down to 16 bytes. *)
   let paddingsize = padlen message () in
   let paddingbyte = dectohex paddingsize in
   let padding = Bytes.make paddingsize paddingbyte in
-  let tmpbf = Buffer.create 500 in
+  (* Session key generation *)
+  let sesk = (Cstruct.create 32) in
   (* Creates a key from randomly generated kbf buffer at randomly generated increment. *)
   for i = 0 to 31 do
-    Buffer.add_char tmpbf (Buffer.nth kbf  (i + !knum));                          
+    Cstruct.set_char sesk i (Buffer.nth kbf  (i + !knum));                          
   done;
-  let key =  AES.CBC.of_secret (Cstruct.of_string (Buffer.contents tmpbf)) in
-  Buffer.clear tmpbf;
-  let cipher_padding = message ^ padding in
-  let ciphertext = AES.CBC.encrypt ~key ~iv (Cstruct.of_string (cipher_padding)) in
+  let key =  AES.CBC.of_secret sesk in  
+  let text_with_padding = Cstruct.create ((Cstruct.len message) + paddingsize) in
+  Cstruct.blit message 0 text_with_padding 0 (Cstruct.len message);
+  Cstruct.blit_from_string padding 0 text_with_padding (Cstruct.len message) paddingsize;
+  let ciphertext = AES.CBC.encrypt ~key ~iv text_with_padding in
   let cipher_iv = (Cstruct.to_string iv) ^ (Cstruct.to_string ciphertext) in
-  Gc.full_major ();
+  (* Clean up. *)
+  Cstruct.memset sesk 0;
+  Cstruct.memset text_with_padding 0;
+  Cstruct.memset ciphertext 0;
 (cipher_iv)
 
 (* Decrypts whatever quickcrypt encrypted using it's key. *) 
 let quickdecrypt (cipher) =
   let s = cipher in
-  let a = String.sub cipher 16 ((String.length cipher) - 16) in
-  let iv = (Cstruct.of_string (Bytes.sub_string s 0 16)) in
-  let tmpbf = Buffer.create 500 in
+  let a = String.sub cipher 16 ((String.length cipher) - 16) in (* Get cipher without IV *)
+  let iv = (Cstruct.of_string (Bytes.sub_string s 0 16)) in (* This is the iv *)
+  (* Session key generation *)
+  let sesk = (Cstruct.create 32) in
   (* Creates a key from randomly generated kbf buffer at randomly generated increment. *)
   for i = 0 to 31 do
-    Buffer.add_char tmpbf (Buffer.nth kbf (i + !knum));                          
+    Cstruct.set_char sesk i (Buffer.nth kbf  (i + !knum));                          
   done;
-  let key =  AES.CBC.of_secret (Cstruct.of_string (Buffer.contents tmpbf)) in
-  Buffer.clear tmpbf;
-  let txtpadding = AES.CBC.decrypt ~key ~iv (Cstruct.of_string a) in
-  let lastbyte =  ((Cstruct.to_string txtpadding).[String.length (Cstruct.to_string txtpadding) - 1]) in
+  let key =  AES.CBC.of_secret sesk in
+  let txt_with_padding = AES.CBC.decrypt ~key ~iv (Cstruct.of_string a) in
+  let lastbyte = Cstruct.get_char txt_with_padding ((Cstruct.len txt_with_padding)-1) in
   let toremove = hextodec lastbyte in
-  let reversed_txt =
-    (Bytes.sub_string (rev_string (Cstruct.to_string txtpadding)) toremove
-                      ((String.length (Cstruct.to_string txtpadding)) - toremove)) in
-  let txt = rev_string reversed_txt in
+  let txt = Cstruct.copy txt_with_padding 0 ((Cstruct.len txt_with_padding)-toremove) in (* UNSAFE *)
 (txt)
 
 let cryptbuff buff () =
       let localbuff = Buffer.create 500 in
-      Buffer.add_string localbuff (quickcrypt (Buffer.contents buff));
+      Buffer.add_string localbuff (quickcrypt (Cstruct.of_string(Buffer.contents buff))); (* UNSAFE *)
       Buffer.clear buff;
       Buffer.add_buffer buff localbuff;
       Buffer.clear localbuff;
@@ -215,7 +216,7 @@ let encrypt buf () =
   let mykey = (Cstruct.of_string (quickdecrypt !keystore)) in
   let key = AES.CBC.of_secret mykey in (* Generate usable key from mykey *)
   let bytecontent = (Buffer.to_bytes buf) in
-  let paddingsize = padlen bytecontent () in
+  let paddingsize = padlen (Cstruct.of_string bytecontent) () in (* UNSAFE *)
   let paddingbyte = dectohex paddingsize in    
   let padding = Bytes.make paddingsize paddingbyte in
   Buffer.add_bytes buf padding;
@@ -548,6 +549,11 @@ let rec main_loop () =
       section_list ();
       main_loop ()
     end
+  else if str = "testing" then begin
+      let x = (quickcrypt (Cstruct.of_string "balls")) in
+      print_endline (quickdecrypt x);
+      main_loop ()
+    end
   else begin
       print_endline "";
       print_endline "That is not a defined option. ";
@@ -572,12 +578,11 @@ let login () =
   done;
   Random.self_init ();
   knum := (Random.int 6);
-  let mykey = Scrypt_kdf.scrypt_kdf ~password ~salt ~n ~r ~p ~dk_len in
+  let mykey = (Scrypt_kdf.scrypt_kdf ~password ~salt ~n ~r ~p ~dk_len) in
   Cstruct.memset password 0; (* This overwrites the password Cstruct with 0's in memory *)
-  keystore := quickcrypt (Cstruct.to_string mykey);
+  keystore := quickcrypt mykey;
   load_file ();
   print_endline "Logged in. ";
-  Gc.full_major (); (* Garbage collect, most of this should get collected. *)
   main_loop() ;
 ;; (* Can I get rid of the ';;' here? *)
 
