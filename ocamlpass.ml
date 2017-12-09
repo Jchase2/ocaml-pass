@@ -151,6 +151,10 @@ let quickdecrypt (cipher) =
   let lastbyte = Cstruct.get_char txt_with_padding ((Cstruct.len txt_with_padding)-1) in
   let toremove = hextodec lastbyte in
   let txt = Cstruct.copy txt_with_padding 0 ((Cstruct.len txt_with_padding)-toremove) in (* UNSAFE *)
+  (* Clean up a bit. *)
+  Cstruct.memset sesk 0;
+  Cstruct.memset txt_with_padding 0;
+  Cstruct.memset iv 0;
 (txt)
 
 let cryptbuff buff () =
@@ -547,11 +551,6 @@ let rec main_loop () =
     end
   else if str = "listblocks" then begin
       section_list ();
-      main_loop ()
-    end
-  else if str = "testing" then begin
-      let x = (quickcrypt (Cstruct.of_string "balls")) in
-      print_endline (quickdecrypt x);
       main_loop ()
     end
   else begin
