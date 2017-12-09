@@ -573,8 +573,8 @@ let login () =
   Random.self_init ();
   knum := (Random.int 6);
   let mykey = Scrypt_kdf.scrypt_kdf ~password ~salt ~n ~r ~p ~dk_len in
+  Cstruct.memset password 0; (* This overwrites the password Cstruct with 0's in memory *)
   keystore := quickcrypt (Cstruct.to_string mykey);
-  let password = "" in (* Might overwrite if not on heap, if I'm understanding correctly. *)
   load_file ();
   print_endline "Logged in. ";
   Gc.full_major (); (* Garbage collect, most of this should get collected. *)
