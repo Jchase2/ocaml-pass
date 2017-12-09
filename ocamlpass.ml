@@ -170,7 +170,7 @@ let decryptbuff buff () =
     ()
   else begin
       let localbuff = Buffer.create 500 in
-      Buffer.add_string localbuff (quickdecrypt (Buffer.contents buff));
+      Buffer.add_string localbuff (quickdecrypt (Buffer.contents buff)); (* UNSAFE *)
       Buffer.clear buff;
       Buffer.add_buffer buff localbuff;
       Buffer.clear localbuff;

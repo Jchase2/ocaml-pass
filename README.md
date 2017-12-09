@@ -51,7 +51,6 @@ When you search for a string, if you just type "email" in this example, all inst
 of email will be printed. This is generally easier to read, but it really comes down to 
 personal preference. 
 
-I'll have more searching / removing / etc implemented shortly. 
 Here's the menu:
 
 ```
@@ -71,8 +70,8 @@ Here's the menu:
 Uses the Nocrypto library, and ocaml-scrypt-kdf, to encrypt. 
 Generates a key with ocaml-scrypt-kdf, runs that through Nocrypto to
 generate the final AES key(s), encrypts and decrypts whatever is entered. 
-Everything else is handled with (usually encrypted) references, variables, 
-and buffers. 
+Everything else is handled with (usually encrypted) references, variables,
+buffers, and Cstructs. 
 
 Sections and passwords are stored like this: 
 
@@ -95,10 +94,6 @@ You can also search for the string "email" and it'll output any lines beginning 
 I'll probably keep adding features to this as time goes on. Any pull requests
 are welcomed. 
 
-* Handle variables and function passing in memory for security.
-* Finish implementing adding / searching functions. 
-* Improve sorting based on delimiters for lines. (Potentially?) 
-* Improve header searching by allowing user to list headers during search dialogue.  
-* Port to mobile / windows / build a basic GUI. Maybe? 
+* Replace reading / searching functions with Cstruct compatible stuff somehow.
 * Build in a password generator. 
 * Maybe down the line, implement a way to sync crypted pw file across more than one machine.
