@@ -2,14 +2,12 @@
 A simple text based password manager written in ocaml. 
 
 This is based on the shell version: https://github.com/Jchase2/simple-pass-manager
-Except theoretically more secure.
 
 ## Features
 
 * AES stored passwords.
 * Scrypt password generated key on login.
 * Never writes to disk.
-* Encrypts key in memory until used. Tries to keep data encrypted as well, until used.
 * Can organize passwords / info by "block". (Blocks explained below.)  
 * Add and remove blocks with a single or multiple lines of text within.  
 * Add and Remove string(s) from blocks.
@@ -71,7 +69,7 @@ Uses the Nocrypto library, and ocaml-scrypt-kdf, to encrypt.
 Generates a key with ocaml-scrypt-kdf, runs that through Nocrypto to
 generate the final AES key(s), encrypts and decrypts whatever is entered. 
 Everything else is handled with (usually encrypted) references, variables,
-buffers, and Cstructs. 
+buffers, and Cstructs. Note: For now, memory encryption is incomplete.  
 
 Sections and passwords are stored like this: 
 
@@ -94,6 +92,7 @@ You can also search for the string "email" and it'll output any lines beginning 
 I'll probably keep adding features to this as time goes on. Any pull requests
 are welcomed. 
 
-* Replace reading / searching functions with Cstruct compatible stuff somehow.
+* Replace printing with Unix stdout for better memory security.
+* Replace regex's with Bigarray iter functions for better memory security. 
 * Build in a password generator. 
 * Maybe down the line, implement a way to sync crypted pw file across more than one machine.
