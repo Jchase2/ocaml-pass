@@ -1,0 +1,4 @@
+(executable
+ (public_name ocaml_pass)
+ (name main)
+ (libraries nocrypto ocaml_pass))
