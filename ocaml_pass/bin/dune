@@ -1,4 +1,5 @@
 (executable
  (public_name ocaml_pass)
  (name main)
- (libraries nocrypto ocaml_pass))
+ (libraries nocrypto nocrypto.unix pcre scrypt-kdf ocaml_pass)
+ (flags (:standard -warn-error -32)))

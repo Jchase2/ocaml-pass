@@ -10,7 +10,6 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Library General Public License for more details. *)
 
 open Nocrypto.Cipher_block
-open Printf
 
 (* ============================== GLOBAL EXPRESSIONS ========================== *)
 let cryptfile = "ocamlpass.crypt"
@@ -36,26 +35,6 @@ let help = [
 
 (* =============================== Crypt Utilities ============================================= *)
 
-(* dectohex and hex2dec are just associative lists to get values for
-hex, which are used for padding, except G which is added so it's still a single char.
-Am considering replacing these with a map, although they're small so performance is fine. *)
-
-let dectohex (x) =
-  let hexlist =
-    [1, '1'; 2, '2'; 3, '3'; 4, '4'; 5, '5';
-     6, '6'; 7, '7'; 8, '8'; 9, '9'; 10, 'A';
-     11, 'B'; 12, 'C'; 13, 'D'; 14, 'E'; 15, 'F'; 16, 'G'] in
-  let ret = List.assoc x hexlist in
-(ret)
-
-let hextodec (x) =
-  let hexlist =
-    ['1', 1; '2', 2; '3', 3; '4', 4; '5', 5; '6', 6;
-     '7', 7; '8', 8; '9', 9; 'A', 10; 'B', 11; 'C', 12;
-     'D', 13; 'E', 14; 'F', 15; 'G', 16] in
-  let ret = List.assoc x hexlist in
-(ret)
-
 (* Copies bytes to buffer, except the first 16 bytes. *)
 (* This essentially helps remove the IV prior to decryption. *)
 let removeiv bytestream buff () =
@@ -64,31 +43,21 @@ let removeiv bytestream buff () =
   done ;
 ()
 
-(* Reverses a string... *)
-let rev_string str =
-  let len = String.length str in
-  let res = Bytes.init len (fun i -> str.[len - 1 - i]) in
-  Bytes.to_string res
-
-
-(* Recursive function to get padding length. *)
-let padlen message () =
-  let i = ref 0 in
-  let rec loop () =
-    let bytelength = (Cstruct.len message) in
-    if ((bytelength mod 16) = 0) then
-      begin
-        i := 16;
-        ()
-      end
-    else if ((bytelength + !i) mod 16) != 0 then
-      begin
-        i := (!i + 1);
-        loop ()
-      end ;
-  in
-  loop();
-(!i)
+  let pkcs7_pad (message: Cstruct.t) : Cstruct.t =
+    let block_size = 16 in
+    let msg_len = Cstruct.length message in
+    let pad_len =
+      if msg_len mod block_size = 0 then block_size
+      else block_size - (msg_len mod block_size)
+    in
+    let padded = Cstruct.create (msg_len + pad_len) in
+    (* Copy the original message *)
+    Cstruct.blit message 0 padded 0 msg_len;
+    (* Append padding bytes; each is the value of pad_len *)
+    for i = 0 to pad_len - 1 do
+      Cstruct.set_uint8 padded (msg_len + i) pad_len
+    done;
+    padded
 
 (* Read cryptfile into a bytestream. *)
 let readtobytes () =
@@ -109,9 +78,7 @@ let quickcrypt (message) =
   let randhash = Nocrypto.Hash.SHA256.digest randnum in (* Hash of randnum *)
   let cshashbytes = Bytes.of_string (Cstruct.to_string randhash) in
   let iv = (Cstruct.of_string (Bytes.to_string (Bytes.sub cshashbytes 0 16))) in (* cut the bytes from above down to 16 bytes. *)
-  let paddingsize = padlen message () in
-  let paddingbyte = dectohex paddingsize in
-  let padding = Bytes.make paddingsize paddingbyte in
+  let padded_message = pkcs7_pad message in
   (* Session key generation *)
   let sesk = (Cstruct.create 32) in
   (* Creates a key from randomly generated kbf buffer at randomly generated increment. *)
@@ -119,22 +86,22 @@ let quickcrypt (message) =
     Cstruct.set_char sesk i (Buffer.nth kbf  (i + !knum));
   done;
   let key =  AES.CBC.of_secret sesk in
-  let text_with_padding = Cstruct.create ((Cstruct.len message) + paddingsize) in
-  Cstruct.blit message 0 text_with_padding 0 (Cstruct.len message);
-  Cstruct.blit_from_string padding 0 text_with_padding (Cstruct.len message) paddingsize;
-  let ciphertext = AES.CBC.encrypt ~key ~iv text_with_padding in
+  let ciphertext = AES.CBC.encrypt ~key ~iv padded_message in
   let cipher_iv = (Cstruct.to_string iv) ^ (Cstruct.to_string ciphertext) in
   (* Clean up. *)
   Cstruct.memset sesk 0;
-  Cstruct.memset text_with_padding 0;
   Cstruct.memset ciphertext 0;
 (cipher_iv)
 
 (* Decrypts whatever quickcrypt encrypted using it's key. *)
 let quickdecrypt (cipher) =
   let s = cipher in
+
+
+
   let a = String.sub cipher 16 ((String.length cipher) - 16) in (* Get cipher without IV *)
-  let iv = (Cstruct.of_string (Bytes.sub_string s 0 16)) in (* This is the iv *)
+
+  let iv = Cstruct.of_string (String.sub s 0 16) in (* This is the iv *)
   (* Session key generation *)
   let sesk = (Cstruct.create 32) in
   (* Creates a key from randomly generated kbf buffer at randomly generated increment. *)
@@ -142,11 +109,12 @@ let quickdecrypt (cipher) =
     Cstruct.set_char sesk i (Buffer.nth kbf  (i + !knum));
   done;
   let key =  AES.CBC.of_secret sesk in
+
   let txt_with_padding = AES.CBC.decrypt ~key ~iv (Cstruct.of_string a) in
-  let lastbyte = Cstruct.get_char txt_with_padding ((Cstruct.len txt_with_padding)-1) in
-  let toremove = hextodec lastbyte in
-  let txt = Cstruct.copy txt_with_padding 0 ((Cstruct.len txt_with_padding)-toremove) in (* UNSAFE *)
-  (* Clean up a bit. *)
+  (* PKCS#7 unpadding: read the last byte to know how many bytes to remove *)
+  let pad_len = int_of_char (Cstruct.get_char txt_with_padding (Cstruct.length txt_with_padding - 1)) in
+  let txt = Cstruct.copy txt_with_padding 0 (Cstruct.length txt_with_padding - pad_len) in
+
   Cstruct.memset sesk 0;
   Cstruct.memset txt_with_padding 0;
   Cstruct.memset iv 0;
@@ -186,14 +154,14 @@ let load_file () =
     let key = AES.CBC.of_secret mykey in (* Generate usable key from mykey *)
     (* txtpadding is decrypted file with padding still included...*)
     let txtpadding = AES.CBC.decrypt ~key ~iv (Cstruct.of_string (Buffer.contents localbuff)) in
-    let lastbyte =  ((Cstruct.to_string txtpadding).[String.length (Cstruct.to_string txtpadding) - 1]) in
-    let toremove = hextodec lastbyte in
-    let reversed_txt =
-      (Bytes.sub_string (rev_string (Cstruct.to_string txtpadding)) toremove
-                        ((String.length (Cstruct.to_string txtpadding)) - toremove)) in
-    let plaintext = rev_string reversed_txt in
-    Buffer.clear localbuff ;
-    Buffer.add_string filebuff plaintext ;
+
+    let txtpadding_str = Cstruct.to_string txtpadding in
+    let pad_len = int_of_char txtpadding_str.[String.length txtpadding_str - 1] in
+    let plaintext = String.sub txtpadding_str 0 (String.length txtpadding_str - pad_len) in
+
+    Buffer.clear localbuff;
+    Buffer.clear filebuff;
+    Buffer.add_string filebuff plaintext;
     cryptbuff filebuff ();
   else begin
       print_endline "File does not exist! A new file has been created." ;
@@ -205,27 +173,33 @@ let load_file () =
 (* Prepend IV, append padding. *)
 (* Replaces contents of cryptfile with contents of buf!
    never call without first merging buffers! *)
-let encrypt buf () =
-  let () = Nocrypto_entropy_unix.initialize () in (* Seeding from /dev/urandom *)
-  let cs = Nocrypto.Rng.generate 256 in (* Random numbers *)
-  let cshash = Nocrypto.Hash.SHA256.digest cs in (* Hash of cs *)
-  let cshashbytes = Bytes.of_string (Cstruct.to_string cshash) in
-  let cutbytes = Bytes.sub cshashbytes 0 16 in (* cut the bytes from above down to 16 bytes. *)
-  let iv = (Cstruct.of_string (Bytes.to_string cutbytes)) in (*Get IV, string of cutbytes. *)
-  let mykey = (Cstruct.of_string (quickdecrypt !keystore)) in
-  let key = AES.CBC.of_secret mykey in (* Generate usable key from mykey *)
-  let bytecontent = (Buffer.to_bytes buf) in
-  let paddingsize = padlen (Cstruct.of_string bytecontent) () in (* UNSAFE *)
-  let paddingbyte = dectohex paddingsize in
-  let padding = Bytes.make paddingsize paddingbyte in
-  Buffer.add_bytes buf padding;
-  let ciphertext = AES.CBC.encrypt ~key ~iv (Cstruct.of_string (Buffer.contents buf)) in
-  let oc = open_out cryptfile in
-  output_string oc (Cstruct.to_string iv);
-  output_string oc (Cstruct.to_string ciphertext);
-  flush oc;
-  close_out oc;
-()
+(* Encrypt contents of buffer, write to file. *)
+(* Prepend IV, append padding. *)
+(* Replaces contents of cryptfile with contents of buf!
+   never call without first merging buffers! *)
+
+   let encrypt buf () =
+    Nocrypto_entropy_unix.initialize (); (* Seed RNG from /dev/urandom *)
+
+    let cs = Nocrypto.Rng.generate 256 in
+    let cshash = Nocrypto.Hash.SHA256.digest cs in
+    let cutbytes = String.sub (Cstruct.to_string cshash) 0 16 in
+    let iv = Cstruct.of_string cutbytes in
+
+    let mykey = Cstruct.of_string (quickdecrypt !keystore) in
+    let key = AES.CBC.of_secret mykey in
+
+    (* Convert the buffer contents into a Cstruct and pad it using PKCS#7 *)
+    let bytecontent = Buffer.contents buf in
+    let padded_message = pkcs7_pad (Cstruct.of_string bytecontent) in
+
+    let ciphertext = AES.CBC.encrypt ~key ~iv padded_message in
+    let oc = open_out cryptfile in
+    output_string oc (Cstruct.to_string iv);
+    output_string oc (Cstruct.to_string ciphertext);
+    flush oc;
+    close_out oc;
+  ()
 
 
 (* ============================== UTILITIES =========================== *)
@@ -381,14 +355,28 @@ let insert_strings () =
 (* Output List of Blocks *)
 let section_list () =
   decryptbuff filebuff ();
-  let regex = Pcre.regexp ~flags:[`DOTALL; `CASELESS; `MULTILINE]("(?!^==== END ====$)(==== .*? ====)") in
-  let x = Pcre.extract_all ~rex:regex (Buffer.contents filebuff) in
-  (* Preferably, will replace this with more functional thing. Couldn't figure out Array.iter nested stuff.*)
-  for i = 0 to (Array.length x) -1 do
-    print_endline (Array.get (Array.get x i) 0)
-  done;
+  let content = Buffer.contents filebuff in
+  if content = "" then
+    print_endline "No content found."
+  else
+    try
+      let regex = Pcre.regexp
+                    ~flags:[`DOTALL; `CASELESS; `MULTILINE]
+                    "(?!^==== END ====$)(==== .*? ====)" in
+      let matches = Pcre.extract_all ~rex:regex content in
+      if Array.length matches = 0 then
+        print_endline "No sections found."
+      else
+        Array.iter (fun match_arr ->
+          if Array.length match_arr > 0 then
+            print_endline match_arr.(0)
+        ) matches
+    with
+    | Not_found ->
+      print_endline "No sections found."
+  ;
   cryptbuff filebuff ();
-()
+  ()
 
 (* Search for and output block. *)
 let search_block () =
@@ -489,69 +477,63 @@ let rec main_loop () =
       decryptbuff filebuff ();
       encrypt filebuff ();
       Gc.full_major ();
-      exit 0;
-      ()
     end
   else if str = "quit" then
     begin
       decryptbuff filebuff ();
       encrypt filebuff ();
       Gc.full_major ();
-      exit 0;
-      ()
     end
   else if str = "q" then
     begin
       decryptbuff filebuff ();
       encrypt filebuff ();
       Gc.full_major ();
-      exit 0;
-      ()
     end
   else if str = "help" then begin
       print_list_string help ();
-      main_loop ()
+      main_loop ();
     end
   else if str = "?" then begin
       print_list_string help ();
-      main_loop ()
+      main_loop ();
     end
   else if str = "block" then begin
       createblock();
-      main_loop()
+      main_loop();
     end
   else if str = "insert" then begin
       insert_strings ();
-      main_loop ()
+      main_loop ();
     end
   else if str = "read" then begin
       read();
-      main_loop()
+      main_loop();
     end
   else if str = "blocksearch" then begin
       search_block();
-      main_loop()
+      main_loop();
     end
   else if str = "removeblock" then begin
       remove_block ();
-      main_loop ()
+      main_loop ();
     end
   else if str = "removestring" then begin
       remove_string ();
-      main_loop ()
+      main_loop ();
     end
   else if str = "stringsearch" then begin
       search_string();
-      main_loop()
+      main_loop();
     end
   else if str = "listblocks" then begin
       section_list ();
-      main_loop ()
+      main_loop ();
     end
   else begin
       print_endline "";
       print_endline "That is not a defined option. ";
-      main_loop ()
+      main_loop ();
     end;
 ()
 
@@ -567,7 +549,7 @@ let login () =
   let password = (Cstruct.of_string (read_line())) in
   let () = Nocrypto_entropy_unix.initialize () in
   let rkn = 47 in
-  for i = 0 to rkn do
+  for _ = 0 to rkn do
     Buffer.add_string kbf (Cstruct.to_string (Nocrypto.Rng.generate 8));
   done;
   Random.self_init ();
