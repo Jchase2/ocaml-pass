@@ -477,18 +477,21 @@ let rec main_loop () =
       decryptbuff filebuff ();
       encrypt filebuff ();
       Gc.full_major ();
+      exit 0;
     end
   else if str = "quit" then
     begin
       decryptbuff filebuff ();
       encrypt filebuff ();
       Gc.full_major ();
+      exit 0;
     end
   else if str = "q" then
     begin
       decryptbuff filebuff ();
       encrypt filebuff ();
       Gc.full_major ();
+      exit 0;
     end
   else if str = "help" then begin
       print_list_string help ();
