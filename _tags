@@ -1,5 +1,0 @@
-true: package(scrypt-kdf)
-true: package(unix)
-true: package(nocrypto.unix)
-true: package(core)
-true: package(pcre)
