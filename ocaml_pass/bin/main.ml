@@ -1,13 +1,13 @@
 (* Copyright (C) 2015 JChase2
-This code is free software; you can redistribute it and/or
-modify it under the terms of the GNU Library General Public
-License as published by the Free Software Foundation; either
-version 2 of the License, or (at your option) any later version.
+   This code is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Library General Public
+   License as published by the Free Software Foundation; either
+   version 2 of the License, or (at your option) any later version.
 
-This library is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-Library General Public License for more details. *)
+   This library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Library General Public License for more details. *)
 
 open Nocrypto.Cipher_block
 
@@ -21,16 +21,16 @@ let knum = ref 0 (* Randomly generated increment initialized on start, used to e
 
 (* Help Dialogue *)
 let help = [
-    " ";
-    "Type 'read' to read the entire file.";
-    "Type 'stringsearch' to search for and print a string.";
-    "Type 'blocksearch' to search for and print a block.";
-    "Type 'block' to insert a new block.";
-    "Type 'insert' to insert new lines into a block.";
-    "Type 'removeblock' to remove a block.";
-    "Type 'removestring' to remove string(s) from a block.";
-    "Type 'listblocks' to list all block headers.";
-    "Type 'q' to quit."
+  " ";
+  "Type 'read' to read the entire file.";
+  "Type 'stringsearch' to search for and print a string.";
+  "Type 'blocksearch' to search for and print a block.";
+  "Type 'block' to insert a new block.";
+  "Type 'insert' to insert new lines into a block.";
+  "Type 'removeblock' to remove a block.";
+  "Type 'removestring' to remove string(s) from a block.";
+  "Type 'listblocks' to list all block headers.";
+  "Type 'q' to quit."
 ]
 
 (* =============================== Crypt Utilities ============================================= *)
@@ -41,23 +41,37 @@ let removeiv bytestream buff () =
   for i = 16 to ((Bytes.length bytestream - 1)) do
     Buffer.add_char buff (Bytes.get bytestream i)
   done ;
-()
+  ()
 
-  let pkcs7_pad (message: Cstruct.t) : Cstruct.t =
-    let block_size = 16 in
-    let msg_len = Cstruct.length message in
-    let pad_len =
-      if msg_len mod block_size = 0 then block_size
-      else block_size - (msg_len mod block_size)
-    in
-    let padded = Cstruct.create (msg_len + pad_len) in
-    (* Copy the original message *)
-    Cstruct.blit message 0 padded 0 msg_len;
-    (* Append padding bytes; each is the value of pad_len *)
-    for i = 0 to pad_len - 1 do
-      Cstruct.set_uint8 padded (msg_len + i) pad_len
-    done;
-    padded
+let pkcs7_pad (message: Cstruct.t) : Cstruct.t =
+  let block_size = 16 in
+  let msg_len = Cstruct.length message in
+  let pad_len =
+    if msg_len mod block_size = 0 then block_size
+    else block_size - (msg_len mod block_size)
+  in
+  let padded = Cstruct.create (msg_len + pad_len) in
+  (* Copy the original message *)
+  Cstruct.blit message 0 padded 0 msg_len;
+  (* Append padding bytes; each is the value of pad_len *)
+  for i = 0 to pad_len - 1 do
+    Cstruct.set_uint8 padded (msg_len + i) pad_len
+  done;
+  padded
+
+let pkcs7_unpad s =
+  let len = String.length s in
+  if len = 0 then failwith "Cannot unpad an empty string"
+  else
+    let pad_len = int_of_char s.[len - 1] in
+    if pad_len <= 0 || pad_len > 16 then
+      failwith "Invalid padding"
+    else
+      for i = 1 to pad_len do
+        if int_of_char s.[len - i] <> pad_len then
+          failwith "Invalid padding"
+      done;
+    String.sub s 0 (len - pad_len)
 
 (* Read cryptfile into a bytestream. *)
 let readtobytes () =
@@ -66,7 +80,7 @@ let readtobytes () =
   let s = Bytes.create n in
   really_input ic s 0 n;
   close_in ic;
-(s)
+  (s)
 
 (* =============================== Encryption / Decryption ========================== *)
 
@@ -91,16 +105,12 @@ let quickcrypt (message) =
   (* Clean up. *)
   Cstruct.memset sesk 0;
   Cstruct.memset ciphertext 0;
-(cipher_iv)
+  (cipher_iv)
 
 (* Decrypts whatever quickcrypt encrypted using it's key. *)
 let quickdecrypt (cipher) =
   let s = cipher in
-
-
-
   let a = String.sub cipher 16 ((String.length cipher) - 16) in (* Get cipher without IV *)
-
   let iv = Cstruct.of_string (String.sub s 0 16) in (* This is the iv *)
   (* Session key generation *)
   let sesk = (Cstruct.create 32) in
@@ -111,34 +121,33 @@ let quickdecrypt (cipher) =
   let key =  AES.CBC.of_secret sesk in
 
   let txt_with_padding = AES.CBC.decrypt ~key ~iv (Cstruct.of_string a) in
-  (* PKCS#7 unpadding: read the last byte to know how many bytes to remove *)
-  let pad_len = int_of_char (Cstruct.get_char txt_with_padding (Cstruct.length txt_with_padding - 1)) in
-  let txt = Cstruct.copy txt_with_padding 0 (Cstruct.length txt_with_padding - pad_len) in
-
+  (*let pad_len = int_of_char (Cstruct.get_char txt_with_padding (Cstruct.length txt_with_padding - 1)) in *)
+  (* let txt = Cstruct.copy txt_with_padding 0 (Cstruct.length txt_with_padding - pad_len) in *)
+  let txt = pkcs7_unpad (Cstruct.to_string txt_with_padding) in
   Cstruct.memset sesk 0;
   Cstruct.memset txt_with_padding 0;
   Cstruct.memset iv 0;
-(txt)
+  (txt)
 
 let cryptbuff buff () =
-      let localbuff = Buffer.create 500 in
-      Buffer.add_string localbuff (quickcrypt (Cstruct.of_string(Buffer.contents buff))); (* UNSAFE *)
-      Buffer.clear buff;
-      Buffer.add_buffer buff localbuff;
-      Buffer.clear localbuff;
-()
+  let localbuff = Buffer.create 500 in
+  Buffer.add_string localbuff (quickcrypt (Cstruct.of_string(Buffer.contents buff))); (* UNSAFE *)
+  Buffer.clear buff;
+  Buffer.add_buffer buff localbuff;
+  Buffer.clear localbuff;
+  ()
 
 let decryptbuff buff () =
   if (Buffer.length buff = 0) then
     ()
   else begin
-      let localbuff = Buffer.create 500 in
-      Buffer.add_string localbuff (quickdecrypt (Buffer.contents buff)); (* UNSAFE *)
-      Buffer.clear buff;
-      Buffer.add_buffer buff localbuff;
-      Buffer.clear localbuff;
-    end;
-()
+    let localbuff = Buffer.create 500 in
+    Buffer.add_string localbuff (quickdecrypt (Buffer.contents buff)); (* UNSAFE *)
+    Buffer.clear buff;
+    Buffer.add_buffer buff localbuff;
+    Buffer.clear localbuff;
+  end;
+  ()
 
 (* Load in encrypted file *)
 (* Also decrypt it. *)
@@ -164,10 +173,10 @@ let load_file () =
     Buffer.add_string filebuff plaintext;
     cryptbuff filebuff ();
   else begin
-      print_endline "File does not exist! A new file has been created." ;
-      print_endline "Type '?' or 'help' for usage." ;
-    end ;
-()
+    print_endline "File does not exist! A new file has been created." ;
+    print_endline "Type '?' or 'help' for usage." ;
+  end ;
+  ()
 
 (* Encrypt contents of buffer, write to file. *)
 (* Prepend IV, append padding. *)
@@ -178,27 +187,27 @@ let load_file () =
 (* Replaces contents of cryptfile with contents of buf!
    never call without first merging buffers! *)
 
-   let encrypt buf () =
-    Nocrypto_entropy_unix.initialize (); (* Seed RNG from /dev/urandom *)
+let encrypt buf () =
+  Nocrypto_entropy_unix.initialize (); (* Seed RNG from /dev/urandom *)
 
-    let cs = Nocrypto.Rng.generate 256 in
-    let cshash = Nocrypto.Hash.SHA256.digest cs in
-    let cutbytes = String.sub (Cstruct.to_string cshash) 0 16 in
-    let iv = Cstruct.of_string cutbytes in
+  let cs = Nocrypto.Rng.generate 256 in
+  let cshash = Nocrypto.Hash.SHA256.digest cs in
+  let cutbytes = String.sub (Cstruct.to_string cshash) 0 16 in
+  let iv = Cstruct.of_string cutbytes in
 
-    let mykey = Cstruct.of_string (quickdecrypt !keystore) in
-    let key = AES.CBC.of_secret mykey in
+  let mykey = Cstruct.of_string (quickdecrypt !keystore) in
+  let key = AES.CBC.of_secret mykey in
 
-    (* Convert the buffer contents into a Cstruct and pad it using PKCS#7 *)
-    let bytecontent = Buffer.contents buf in
-    let padded_message = pkcs7_pad (Cstruct.of_string bytecontent) in
+  (* Convert the buffer contents into a Cstruct and pad it using PKCS#7 *)
+  let bytecontent = Buffer.contents buf in
+  let padded_message = pkcs7_pad (Cstruct.of_string bytecontent) in
 
-    let ciphertext = AES.CBC.encrypt ~key ~iv padded_message in
-    let oc = open_out cryptfile in
-    output_string oc (Cstruct.to_string iv);
-    output_string oc (Cstruct.to_string ciphertext);
-    flush oc;
-    close_out oc;
+  let ciphertext = AES.CBC.encrypt ~key ~iv padded_message in
+  let oc = open_out cryptfile in
+  output_string oc (Cstruct.to_string iv);
+  output_string oc (Cstruct.to_string ciphertext);
+  flush oc;
+  close_out oc;
   ()
 
 
@@ -208,11 +217,11 @@ let load_file () =
 let rec print_list_string mylist () = match mylist with
   | [] -> print_endline " "
   | head::body ->
-     begin
-       print_endline head;
-       print_list_string body
-     end
-()
+    begin
+      print_endline head;
+      print_list_string body
+    end
+      ()
 
 (* Merges the buffers... *)
 (* Should only be used if new block was added. *)
@@ -224,13 +233,13 @@ let mergecrypt () =
   Buffer.clear globalbuff ;
   cryptbuff filebuff ();
   cryptbuff globalbuff ();
-()
+  ()
 
 let read () =
   decryptbuff filebuff ();
   print_endline (Buffer.contents filebuff) ;
   cryptbuff filebuff ();
-()
+  ()
 
 
 (* ======================== Insertion / Searching Functions ========================= *)
@@ -304,7 +313,7 @@ let rec createblock () =
       mergecrypt() ;
       cryptbuff globalbuff ();
     end ;
-()
+  ()
 
 (* Insert additional string(s) into a block. *)
 let insert_strings () =
@@ -345,11 +354,11 @@ let insert_strings () =
       cryptbuff filebuff ();
     with
       Not_found -> print_endline "Not found.";
-                   cryptbuff filebuff();
+      cryptbuff filebuff();
   with
     Not_found -> print_endline "Not found.";
-                 cryptbuff filebuff();
-()
+    cryptbuff filebuff();
+    ()
 
 
 (* Output List of Blocks *)
@@ -359,22 +368,22 @@ let section_list () =
   if content = "" then
     print_endline "No content found."
   else
-    try
-      let regex = Pcre.regexp
-                    ~flags:[`DOTALL; `CASELESS; `MULTILINE]
-                    "(?!^==== END ====$)(==== .*? ====)" in
-      let matches = Pcre.extract_all ~rex:regex content in
-      if Array.length matches = 0 then
-        print_endline "No sections found."
-      else
-        Array.iter (fun match_arr ->
-          if Array.length match_arr > 0 then
-            print_endline match_arr.(0)
-        ) matches
-    with
-    | Not_found ->
-      print_endline "No sections found."
-  ;
+    (try
+       let regex = Pcre.regexp
+           ~flags:[`DOTALL; `CASELESS; `MULTILINE]
+           "(?!^==== END ====$)(==== .*? ====)" in
+       let matches = Pcre.extract_all ~rex:regex content in
+       if Array.length matches = 0 then
+         print_endline "No sections found."
+       else
+         Array.iter (fun match_arr ->
+             if Array.length match_arr > 0 then
+               print_endline match_arr.(0)
+           ) matches
+     with
+     | Not_found ->
+       print_endline "No sections found.");
+  (* Always re-encrypt the buffer after listing sections *)
   cryptbuff filebuff ();
   ()
 
@@ -392,8 +401,8 @@ let search_block () =
     cryptbuff filebuff ();
   with
     Not_found -> print_endline "Not found.";
-                 cryptbuff filebuff();
-()
+    cryptbuff filebuff();
+    ()
 
 (* Searches for strings starting with user input. *)
 let search_string () =
@@ -410,8 +419,8 @@ let search_string () =
     cryptbuff filebuff ();
   with
     Not_found -> print_endline "Not found.";
-                 cryptbuff filebuff();
-()
+    cryptbuff filebuff();
+    ()
 
 let remove_block () =
   decryptbuff filebuff ();
@@ -428,8 +437,8 @@ let remove_block () =
     cryptbuff filebuff ();
   with
     Not_found -> print_endline "Not found.";
-                 cryptbuff filebuff();
-()
+    cryptbuff filebuff();
+    ()
 
 (* removes a string from within a block. *)
 let remove_string () =
@@ -456,11 +465,11 @@ let remove_string () =
       cryptbuff filebuff ();
     with
       Not_found -> print_endline "Not found.";
-                   cryptbuff filebuff();
+      cryptbuff filebuff();
   with
     Not_found -> print_endline "Not found.";
-                 cryptbuff filebuff();
-()
+    cryptbuff filebuff();
+    ()
 
 (* =============================== MAIN and Configure ============================ *)
 
@@ -474,11 +483,11 @@ let rec main_loop () =
   print_string "Command: ";
   let str = read_line () in
   if str = "exit" then begin
-      decryptbuff filebuff ();
-      encrypt filebuff ();
-      Gc.full_major ();
-      exit 0;
-    end
+    decryptbuff filebuff ();
+    encrypt filebuff ();
+    Gc.full_major ();
+    exit 0;
+  end
   else if str = "quit" then
     begin
       decryptbuff filebuff ();
@@ -494,51 +503,51 @@ let rec main_loop () =
       exit 0;
     end
   else if str = "help" then begin
-      print_list_string help ();
-      main_loop ();
-    end
+    print_list_string help ();
+    main_loop ();
+  end
   else if str = "?" then begin
-      print_list_string help ();
-      main_loop ();
-    end
+    print_list_string help ();
+    main_loop ();
+  end
   else if str = "block" then begin
-      createblock();
-      main_loop();
-    end
+    createblock();
+    main_loop();
+  end
   else if str = "insert" then begin
-      insert_strings ();
-      main_loop ();
-    end
+    insert_strings ();
+    main_loop ();
+  end
   else if str = "read" then begin
-      read();
-      main_loop();
-    end
+    read();
+    main_loop();
+  end
   else if str = "blocksearch" then begin
-      search_block();
-      main_loop();
-    end
+    search_block();
+    main_loop();
+  end
   else if str = "removeblock" then begin
-      remove_block ();
-      main_loop ();
-    end
+    remove_block ();
+    main_loop ();
+  end
   else if str = "removestring" then begin
-      remove_string ();
-      main_loop ();
-    end
+    remove_string ();
+    main_loop ();
+  end
   else if str = "stringsearch" then begin
-      search_string();
-      main_loop();
-    end
+    search_string();
+    main_loop();
+  end
   else if str = "listblocks" then begin
-      section_list ();
-      main_loop ();
-    end
+    section_list ();
+    main_loop ();
+  end
   else begin
-      print_endline "";
-      print_endline "That is not a defined option. ";
-      main_loop ();
-    end;
-()
+    print_endline "";
+    print_endline "That is not a defined option. ";
+    main_loop ();
+  end;
+  ()
 
 (* Configure pw, generate scrypt key, decrypt and load in file on launch. *)
 let login () =
